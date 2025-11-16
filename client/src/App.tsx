@@ -15,8 +15,6 @@ import Distribution from "@/pages/distribution";
 import Inventory from "@/pages/inventory";
 import Settings from "@/pages/settings";
 
-import { useEffect } from "react";
-
 function ProtectedRoute({ component: Component }: { component: () => JSX.Element }) {
   const [, setLocation] = useLocation();
   const { data: user, isLoading } = useQuery<any>({
