@@ -5,33 +5,33 @@ from fastapi import HTTPException, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import List
 from pydantic import BaseModel
-from dotenv import dotenv_values
 import os
-from motor.motor_asyncio import AsyncIOMotorClient
+from pathlib import Path
+from dotenv import load_dotenv
+
+# .env dosyasını doğru konumdan yükle
+_ROOT = Path(__file__).parent.parent
+load_dotenv(_ROOT / '.env')
 
 # Security setup
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
-_ENV = dotenv_values('/app/backend/.env')
-SECRET_KEY = os.environ.get("SECRET_KEY") or _ENV.get("SECRET_KEY")
+SECRET_KEY = os.environ.get("SECRET_KEY")
 if not SECRET_KEY:
     raise RuntimeError('SECRET_KEY environment variable is required')
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 
-# MongoDB
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+# PostgreSQL adaptörü üzerinden db
+from config.database import db
 
 # Import User model
 try:
     from models.user import User, UserRole
 except Exception:
-    # Fallback for when models are not yet available
     from pydantic import BaseModel
     from enum import Enum
-    
+
     class UserRole(str, Enum):
         ADMIN = "admin"
         WAREHOUSE_MANAGER = "warehouse_manager"
@@ -40,9 +40,10 @@ except Exception:
         CUSTOMER = "customer"
         ACCOUNTING = "accounting"
         SALES_AGENT = "sales_agent"
-    
+
     class User(BaseModel):
         pass
+
 
 class CustomerAuthPrincipal(BaseModel):
     id: str
@@ -57,8 +58,10 @@ class CustomerAuthPrincipal(BaseModel):
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
+
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
@@ -69,6 +72,7 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
 
 async def get_current_user(request: Request, credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Get current authenticated user"""
@@ -115,12 +119,11 @@ async def get_current_user(request: Request, credentials: HTTPAuthorizationCrede
     except Exception:
         return user_doc
 
-def require_role(allowed_roles: List[UserRole]):
+
+def require_role(allowed_roles: List):
     """Role-based access control"""
-    async def role_checker(current_user = Depends(get_current_user)):
-        # Handle both User object and dict
+    async def role_checker(current_user=Depends(get_current_user)):
         user_role = current_user.role if hasattr(current_user, 'role') else current_user.get('role')
-        
         if user_role not in allowed_roles:
             raise HTTPException(status_code=403, detail="Not authorized to perform this action")
         return current_user

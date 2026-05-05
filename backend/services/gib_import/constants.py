@@ -3,7 +3,8 @@
 import os
 from dotenv import dotenv_values
 
-_ENV = dotenv_values('/app/backend/.env')
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_ENV = dotenv_values(os.path.join(_ROOT, '.env'))
 
 COLL_SALESPERSONS = 'salespersons'
 COLL_DRAFT_CUSTOMERS = 'draft_customers'

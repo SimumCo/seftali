@@ -1,24 +1,24 @@
-from motor.motor_asyncio import AsyncIOMotorClient
-from .settings import settings
+"""
+PostgreSQL JSONB üzerinde çalışan MongoDB-uyumlu veritabanı katmanı.
+motor/AsyncIOMotorClient kullanımını şeffaf biçimde PostgreSQL'e yönlendirir.
+"""
+from config.pg_mongo_adapter import get_pg_client, get_pg_database, DatabaseProxy
 
 class Database:
-    client: AsyncIOMotorClient = None
-    
+    _db: DatabaseProxy = None
+
     @classmethod
-    def get_client(cls) -> AsyncIOMotorClient:
-        if cls.client is None:
-            cls.client = AsyncIOMotorClient(settings.MONGO_URL)
-        return cls.client
-    
+    def get_client(cls):
+        return get_pg_client()
+
     @classmethod
-    def get_database(cls):
-        client = cls.get_client()
-        return client[settings.DB_NAME]
-    
+    def get_database(cls) -> DatabaseProxy:
+        if cls._db is None:
+            cls._db = get_pg_database()
+        return cls._db
+
     @classmethod
     def close_connection(cls):
-        if cls.client:
-            cls.client.close()
-            cls.client = None
+        pass  # PostgreSQL bağlantı havuzu otomatik yönetilir
 
 db = Database.get_database()
