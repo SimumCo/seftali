@@ -1,0 +1,70 @@
+{
+  "theme": "light",
+  "typography": {
+    "headings": "Manrope, sans-serif or default Tailwind system sans, heavily utilizing tracking-tight for modern look",
+    "body": "Inter, sans-serif or default Tailwind system sans",
+    "rules": [
+      "Use tracking-tight for all headings > 24px",
+      "Do not use generic sans for headings if variable fonts are available. If standard fonts must be used, rely on font-black or font-extrabold with tight letter spacing for impact.",
+      "Never center-align paragraphs; maintain left alignment for readability."
+    ]
+  },
+  "colors": {
+    "primary": "Orange (#f97316) for primary CTAs and active states",
+    "background": "White and Slate-50 to Slate-100 for subtle structural contrast",
+    "text": "Slate-900 for primary headings, Slate-500 for secondary body text",
+    "badges": {
+      "önerilen": "Emerald (bg-emerald-50 text-emerald-700) - For recommendations",
+      "dikkat": "Amber (bg-amber-50 text-amber-700) - For warnings like over-ordering",
+      "skt": "Red (bg-red-50 text-red-700) - For urgent warnings"
+    }
+  },
+  "layouts": {
+    "overall": "Mobile-first single column layout. Wrap the main content in a max-w-3xl or max-w-4xl container to prevent it from stretching too wide on desktop. No sidebars.",
+    "header": "Left-aligned, large typography, with an inline delivery badge.",
+    "list": "Vertical stack (flex-col) with gap-5 or gap-6. Generous spacing between product cards.",
+    "bottom_bar": "Fixed to the bottom of the viewport, full width, backdrop blur, top border. Z-index 50."
+  },
+  "component_name": "DraftView",
+  "component_path": "/app/frontend/src/components/shared/DraftView.js",
+  "visual_enhancers": [
+    "Card Border Radius: Use rounded-[24px] or rounded-[28px] for product cards to match the plasiyer screen design system exactly.",
+    "Card Shadows: shadow-[0_16px_40px_-30px_rgba(15,23,42,0.4)] for resting, and shadow-[0_18px_45px_-28px_rgba(15,23,42,0.45)] on hover.",
+    "Use Lucide icons with soft rounded backgrounds (rounded-2xl) for product visuals.",
+    "Inner padding: p-5 or p-6 for cards to ensure they feel less dense and more consumer-friendly."
+  ],
+  "motion": [
+    "Hover states on cards and buttons: transition-transform hover:-translate-y-0.5",
+    "Smooth color transitions for buttons and quantity steppers: transition-colors duration-200",
+    "Backdrop blur on the sticky bottom summary bar: backdrop-blur-xl bg-white/80"
+  ],
+  "instructions_to_main_agent": [
+    "Redesign `DraftView.js` to be a mobile-first, single-column layout. Remove the 2-column `lg:grid-cols-3` layout.",
+    "HEADER: Title should be 'Sipariş Oluştur', Subtitle: 'Size özel önerilen ürünlerle hızlı sipariş verin'. Add next delivery day using `routeLabel` (e.g. 'Teslimat: Pazartesi').",
+    "PRODUCT CARD: Redesign to match the plasiyer `WarehouseDraftPage` style (large rounded corners like `rounded-[24px]`, specific soft shadows). Show product name, and small unit info. Remove depot stock, plasiyer stock, logistics info, and technical badges.",
+    "RECOMMENDATION BADGE: If `product.suggested_qty > 0`, show an 'Önerilen: X' badge highlighted in emerald/green. Include a short explanation below it: 'Son sipariş ve tüketim hızınıza göre önerildi'.",
+    "WARNING BADGES (Optional): If the user enters a quantity significantly higher than suggested (e.g., > suggested * 2), show a warning: 'Bu miktar ihtiyacınızdan fazla olabilir'. If a product is frequently bought (avg_daily > 5), show: 'Bu ürün hızlı tükeniyor'.",
+    "QUANTITY INPUT: Replace the current complex input with a cleaner stepper (+ / - / manual) similar to `DraftEnginePage`. Default value must be 0 (empty in UI). Use `suggested_qty` as a placeholder. The user MUST enter a value manually or via stepper. Do NOT allow submitting 0. Do not automatically add suggested_qty to the cart on submit unless explicitly set by the user.",
+    "BOTTOM STICKY BAR: Remove the right-hand order summary panel. Create a fixed bottom bar (`fixed bottom-0 left-0 right-0`) showing `totalItems` (Toplam Koli), the number of unique items selected, and a primary button 'Siparişi Gözden Geçir'.",
+    "SUBMIT ACTION: The 'Siparişi Gözden Geçir' button should trigger the existing `handleSubmitOrder` function. Do not add new flows or modals, keep it triggering the existing API submission.",
+    "Keep all existing backend logic, API calls (`sfCustomerAPI`), and state management hooks (`useCountdown`, etc.) intact. Only adjust UI/UX."
+  ],
+  "accessibility": [
+    "Ensure contrast ratio for text on badges is at least 4.5:1 (e.g., text-emerald-700 on bg-emerald-50 is generally safe).",
+    "Add `data-testid` attributes to all interactive elements: inputs, buttons, product cards, bottom bar.",
+    "Inputs must have `aria-label` or related text context for screen readers."
+  ],
+  "media": {
+    "icons": "lucide-react"
+  },
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "You tend to converge toward generic, 'on distribution' outputs. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "Do not make generic centered layouts. Use generous spacing (p-6, p-8) and keep text left-aligned.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur) for sticky bars.",
+    "Do not apply `transition: all`. Use specific transitions like `transition-transform`, `transition-colors`.",
+    "All interactive elements MUST include a `data-testid` attribute (kebab-case, role-based) to facilitate robust automated testing.",
+    "DO NOT use complete transparent background in header or overlays. Ensure content beneath is unreadable without a scrim or blur.",
+    "NEVER use emojis for icons where a Lucide icon fits better, unless specified by existing data mapping (like `getProductImage`)."
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "summary": "Plasiyer Draft Customer Management Frontend Batch testing completed successfully. All features working correctly including draft customer list, approve modal, and integration with backend APIs.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_draft_customers_batch.py",
+    "/app/test_reports/pytest/draft_customers_batch_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_draft_customers_batch.py"
+  ],
+  "success_rate": {
+    "backend": "100% (9 passed)",
+    "frontend": "100% (all flows verified)"
+  },
+  "seed_data_creation": "None - used existing draft customers from previous GIB import",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Draft Customer Management batch verified. Key findings: 1) Plasiyer login works with sf_plasiyer/plasiyer123. 2) Customers page has two subviews: 'Aktif Müşteriler' and 'Draft Müşteriler' tabs. 3) No new sidebar item was added - Draft Customers is inside existing Customers area. 4) Default view is Active Customers (no regression). 5) Draft Customers tab loads data from GET /api/draft-customers?salespersonId= successfully. 6) Draft customer cards show: business_name, tax_number/tc_no, invoice_count, last_invoice_date, total_amount, status. 7) Loading/empty/error states exist with proper data-testid attributes. 8) Approve button opens modal with form fields: customer_type, risk_limit, balance, phone, address. 9) Approve form submits to POST /api/draft-customers/:id/approve successfully. 10) On successful approve, toast shows 'Draft müşteri onaylandı' and row disappears from list. 11) Mobile viewport works correctly for both list and modal. 12) Backend validation errors return proper HTTP status codes (422 for validation, 404 for not found, 403 for wrong salesperson).",
+  "test_details": {
+    "backend_tests": {
+      "TestDraftCustomersAPI": {
+        "test_plasiyer_login_success": "PASS",
+        "test_get_draft_customers_success": "PASS",
+        "test_get_draft_customers_without_salesperson_id": "PASS - returns 422",
+        "test_get_draft_customers_wrong_salesperson_id": "PASS - returns 403",
+        "test_approve_draft_customer_not_found": "PASS - returns 404",
+        "test_approve_draft_customer_validation": "PASS"
+      },
+      "TestDraftCustomersDataStructure": {
+        "test_draft_customer_fields": "PASS - all expected fields present"
+      },
+      "TestNoAuthAccess": {
+        "test_get_draft_customers_no_auth": "PASS - returns 403",
+        "test_approve_draft_customer_no_auth": "PASS - returns 403"
+      }
+    },
+    "frontend_tests": {
+      "plasiyer_login": "PASS - sf_plasiyer/plasiyer123 works",
+      "customers_page_renders": "PASS - no regression on existing active customer view",
+      "view_switcher_tabs": "PASS - 'Aktif Müşteriler' and 'Draft Müşteriler' tabs present",
+      "default_view_is_active": "PASS - Active Customers tab selected by default",
+      "draft_customers_loads_data": "PASS - 14 draft customers loaded from backend",
+      "draft_customer_card_fields": "PASS - business_name, tax/tc, invoice_count, last_invoice_date, total_amount, status displayed",
+      "loading_state_testid": "PASS - data-testid='draft-customers-loading-state' exists",
+      "empty_state_testid": "PASS - data-testid='draft-customers-empty-state' exists",
+      "error_state_testid": "PASS - data-testid='draft-customers-error-state' exists",
+      "approve_button_opens_modal": "PASS - modal opens with all form fields",
+      "approve_modal_form_fields": "PASS - customer_type, risk_limit, balance, phone, address present",
+      "approve_submit_success": "PASS - toast shows success, row removed from list",
+      "no_new_sidebar_item": "PASS - sidebar has only: Ana Sayfa, Smart Orders, Musteriler, Siparisler, Stok, Teslimatlar, Kampanyalar",
+      "mobile_viewport_list": "PASS - draft customer list renders correctly on mobile",
+      "mobile_viewport_modal": "PASS - approve modal renders correctly on mobile"
+    }
+  },
+  "test_credentials": {
+    "plasiyer": "sf_plasiyer / plasiyer123"
+  },
+  "verified_requirements": {
+    "no_new_sidebar_item": true,
+    "draft_customers_inside_customers_area": true,
+    "existing_customer_screens_not_broken": true,
+    "mobile_first_design": true,
+    "draft_customer_list_fields": ["business_name", "tax_number/tc_no", "invoice_count", "last_invoice_date", "total_amount", "status"],
+    "approve_modal_fields": ["customer_type", "risk_limit", "balance", "phone", "address"],
+    "approve_success_behavior": "row disappears and toast shows",
+    "loading_empty_error_states": true,
+    "backend_validation_messages_shown": true
+  }
+}

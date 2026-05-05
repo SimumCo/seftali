@@ -1,0 +1,87 @@
+{
+  "dataset_id": "ailem_market_smart_order_invoice_logic_v1",
+  "customer": {
+    "id": "8a422e18-791f-4e6a-88b0-583f20fba6d4",
+    "name": "AILEM MARKET GURBET DURMUS",
+    "route_days": ["MON", "FRI"]
+  },
+  "products": [
+    {
+      "product_id": "AILEM_AYRAN_2L_TEST",
+      "name": "Ayran 2L",
+      "unit_type": "Bottle",
+      "shelf_life_days": 10
+    },
+    {
+      "product_id": "AILEM_KOVA_YOGURT_TEST",
+      "name": "Kova Yoğurt",
+      "unit_type": "Unit",
+      "shelf_life_days": 28
+    }
+  ],
+  "deliveries_loaded": [
+    {
+      "date": "2026-03-09",
+      "route_day": "MON",
+      "invoice_no": "AILEM-SMART-001",
+      "items": [
+        { "product_id": "AILEM_AYRAN_2L_TEST", "qty": 400 },
+        { "product_id": "AILEM_KOVA_YOGURT_TEST", "qty": 10 }
+      ]
+    },
+    {
+      "date": "2026-03-13",
+      "route_day": "FRI",
+      "invoice_no": "AILEM-SMART-002",
+      "items": [
+        { "product_id": "AILEM_AYRAN_2L_TEST", "qty": 300 }
+      ]
+    },
+    {
+      "date": "2026-03-16",
+      "route_day": "MON",
+      "invoice_no": "AILEM-SMART-003",
+      "items": [
+        { "product_id": "AILEM_AYRAN_2L_TEST", "qty": 400 },
+        { "product_id": "AILEM_KOVA_YOGURT_TEST", "qty": 10 }
+      ]
+    },
+    {
+      "date": "2026-03-20",
+      "route_day": "FRI",
+      "invoice_no": "AILEM-SMART-004",
+      "items": [
+        { "product_id": "AILEM_AYRAN_2L_TEST", "qty": 300 }
+      ]
+    }
+  ],
+  "expected_historical_output": {
+    "daily_consumption": {
+      "AILEM_AYRAN_2L_TEST": 100.0,
+      "AILEM_KOVA_YOGURT_TEST": 1.43
+    },
+    "current_estimated_stock_after_last_friday": {
+      "AILEM_AYRAN_2L_TEST": 300,
+      "AILEM_KOVA_YOGURT_TEST": 4
+    },
+    "days_of_stock_remaining_after_last_friday": {
+      "AILEM_AYRAN_2L_TEST": 3.0,
+      "AILEM_KOVA_YOGURT_TEST": 3.0
+    },
+    "recommended_order_for_next_monday_delivery": {
+      "AILEM_AYRAN_2L_TEST": 400,
+      "AILEM_KOVA_YOGURT_TEST": 10
+    },
+    "warning_flags": {
+      "AILEM_AYRAN_2L_TEST": {
+        "low_stock_risk": true,
+        "expiration_risk": false
+      },
+      "AILEM_KOVA_YOGURT_TEST": {
+        "low_stock_risk": true,
+        "expiration_risk": false
+      }
+    }
+  },
+  "note": "Current live /api/seftali/customer/draft output depends on server date and active route window. Historical expected output above is the scenario reference for Monday-next-delivery interpretation."
+}
