@@ -10,7 +10,7 @@ import {
   Truck, ShoppingBag, Plus, Package, LogOut, Users, 
   TrendingUp, Home, Search, Filter, AlertTriangle, 
   BarChart3, RotateCcw, Navigation, ChevronRight,
-  Box, Tag, PlugZap
+  Box, Tag, PlugZap, Map
 } from 'lucide-react';
 
 // Import Layout Components
@@ -29,6 +29,7 @@ import StockPage from '../components/plasiyer/StockPage';
 import CampaignsPage from '../components/plasiyer/CampaignsPage';
 import { DraftCustomersManager } from '../components/plasiyer/DraftCustomersManager';
 import GibConnectionPage from './GibConnectionPage';
+import RouteMapPage from '../components/plasiyer/RouteMapPage';
 
 // Day translations
 const dayTranslations = {
@@ -240,6 +241,7 @@ const PlasiyerDashboardShell = () => {
   // Sidebar navigation items
   const sidebarItems = [
     { id: 'dashboard', label: 'Ana Sayfa', icon: Home },
+    { id: 'harita', label: 'Rota Haritası', icon: Map },
     { id: 'akilli-siparis', label: 'Smart Orders', icon: Package },
     { id: 'customers', label: 'Musteriler', icon: Users },
     { id: 'orders', label: 'Siparisler', icon: ShoppingBag, badge: stats.pendingOrders },
@@ -268,6 +270,8 @@ const PlasiyerDashboardShell = () => {
             salespersonId={user?.id}
           />
         );
+      case 'harita':
+        return <RouteMapPage routeDay={todayCode} />;
       case 'rut':
         return <RutPage routeDay={todayCode} todayCustomers={todayCustomers} />;
       case 'akilli-siparis':

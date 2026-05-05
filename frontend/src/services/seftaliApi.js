@@ -42,6 +42,9 @@ export const sfSalesAPI = {
   getRouteCustomers: (routeDay) => api.get(`/seftali/sales/plasiyer/route-customers/${routeDay}`),
   getPlasiyerStock: () => api.get('/seftali/sales/plasiyer/stock'),
   updatePlasiyerStock: (data) => api.patch('/seftali/sales/plasiyer/stock', data),
+  // Rota Haritası & Optimizasyon
+  getRouteMap: (routeDay, optimize = false) => api.get(`/seftali/sales/route-map/${routeDay}`, { params: { optimize } }),
+  optimizeRoute: (data) => api.post('/seftali/sales/route-map/optimize', data),
 };
 
 // ŞEFTALİ Admin API
