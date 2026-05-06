@@ -56,7 +56,7 @@ async def _get_smart_ordering_enabled() -> bool:
 async def _fetch_route_customers(route_day: str, salesperson_id: str) -> list:
     """Verilen gün için plasiyerin rota müşterilerini getirir."""
     cursor = db[COL_CUSTOMERS].find(
-        {"is_active": True, "route_plan.days": route_day},
+        {"is_active": True, "route_plan.days": route_day, "user_id": salesperson_id},
         {"_id": 0}
     )
     customers = await cursor.to_list(length=500)
