@@ -28,10 +28,10 @@ def _id():
 
 class GIBImportRepository:
     def __init__(self, db):
-        self.jobs = BaseRepository(db, COLL_GIB_IMPORT_JOBS)
-        self.invoices = BaseRepository(db, COLL_INVOICES)
-        self.invoice_lines = BaseRepository(db, COLL_INVOICE_LINES)
-        self.draft_customers = BaseRepository(db, COLL_DRAFT_CUSTOMERS)
+        self.jobs = BaseRepository(COLL_GIB_IMPORT_JOBS, db)
+        self.invoices = BaseRepository(COLL_INVOICES, db)
+        self.invoice_lines = BaseRepository(COLL_INVOICE_LINES, db)
+        self.draft_customers = BaseRepository(COLL_DRAFT_CUSTOMERS, db)
         self.db = db
 
     async def create_import_job(self, salesperson_id: str) -> dict:

@@ -31,6 +31,8 @@ Türkçe B2B süt ürünleri dağıtım platformu. Müşteri sipariş, plasiyer 
 - **Tablo şeması**: Her koleksiyon `CREATE TABLE <name> (id TEXT PRIMARY KEY, doc JSONB)` — sorgular `doc->>...` ile yapılıyor.
 - **`create_index` çağrıları kaldırıldı**: PostgreSQL otomatik indexler ve JSONB GIN index gerektiğinde manuel eklenebilir.
 - **bulk_write yerine manuel loop**: Adaptör henüz `UpdateOne` operasyonlarını desteklemiyor; `gib_import_repository.py` manuel upsert yapıyor.
+- **Adaptör motor uyumlu kwargs**: `CollectionProxy` metotları `session=` gibi motor-spesifik kwarg'ları sessizce yutar (`**_ignored`).
+- **Tek tüketim sistemi**: Eski `ConsumptionCalculationService` + `PeriodicConsumptionService` silindi; tek geçerli sistem `services/gib_import/consumption_service.py:CustomerConsumptionService`. YoY/trend metodları (`compare_yoy`, `analyze_yearly_trend`, `yoy_overview`) bu servise eklendi, günlük tüketim satırlarından gerçek zamanlı aggregate yapılır.
 
 ## Product
 

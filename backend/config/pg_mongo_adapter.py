@@ -443,7 +443,7 @@ class CollectionProxy:
         self._col = collection_name
 
     # --- find_one ---
-    async def find_one(self, query: dict = None, projection: dict = None) -> Optional[dict]:
+    async def find_one(self, query: dict = None, projection: dict = None, **_ignored) -> Optional[dict]:
         query = query or {}
         pool = await _get_pool()
         async with pool.acquire() as conn:
@@ -461,11 +461,11 @@ class CollectionProxy:
             return _apply_projection(doc, projection)
 
     # --- find (cursor) ---
-    def find(self, query: dict = None, projection: dict = None):
+    def find(self, query: dict = None, projection: dict = None, **_ignored):
         return CursorProxy(self._col, query or {}, projection)
 
     # --- insert_one ---
-    async def insert_one(self, document: dict) -> Any:
+    async def insert_one(self, document: dict, **_ignored) -> Any:
         doc = dict(document)
         doc.pop("_id", None)
         pool = await _get_pool()
@@ -479,7 +479,7 @@ class CollectionProxy:
         return type("InsertResult", (), {"inserted_id": doc.get("id", "")})()
 
     # --- update_one ---
-    async def update_one(self, query: dict, update: dict, upsert: bool = False) -> Any:
+    async def update_one(self, query: dict, update: dict, upsert: bool = False, **_ignored) -> Any:
         pool = await _get_pool()
         async with pool.acquire() as conn:
             await _ensure_table(self._col, conn)
@@ -520,7 +520,7 @@ class CollectionProxy:
         return type("UpdateResult", (), {"matched_count": 1, "modified_count": 1})()
 
     # --- update_many ---
-    async def update_many(self, query: dict, update: dict) -> Any:
+    async def update_many(self, query: dict, update: dict, **_ignored) -> Any:
         pool = await _get_pool()
         async with pool.acquire() as conn:
             await _ensure_table(self._col, conn)
@@ -544,7 +544,7 @@ class CollectionProxy:
         return type("UpdateResult", (), {"matched_count": count, "modified_count": count})()
 
     # --- delete_one ---
-    async def delete_one(self, query: dict) -> Any:
+    async def delete_one(self, query: dict, **_ignored) -> Any:
         pool = await _get_pool()
         async with pool.acquire() as conn:
             await _ensure_table(self._col, conn)
@@ -561,7 +561,7 @@ class CollectionProxy:
         return type("DeleteResult", (), {"deleted_count": 0})()
 
     # --- delete_many ---
-    async def delete_many(self, query: dict) -> Any:
+    async def delete_many(self, query: dict, **_ignored) -> Any:
         pool = await _get_pool()
         async with pool.acquire() as conn:
             await _ensure_table(self._col, conn)
@@ -576,7 +576,7 @@ class CollectionProxy:
         return type("DeleteResult", (), {"deleted_count": count})()
 
     # --- count_documents ---
-    async def count_documents(self, query: dict = None) -> int:
+    async def count_documents(self, query: dict = None, **_ignored) -> int:
         query = query or {}
         pool = await _get_pool()
         async with pool.acquire() as conn:
@@ -591,7 +591,7 @@ class CollectionProxy:
             return row["cnt"] if row else 0
 
     # --- replace_one ---
-    async def replace_one(self, query: dict, replacement: dict, upsert: bool = False) -> Any:
+    async def replace_one(self, query: dict, replacement: dict, upsert: bool = False, **_ignored) -> Any:
         pool = await _get_pool()
         async with pool.acquire() as conn:
             await _ensure_table(self._col, conn)
@@ -618,16 +618,16 @@ class CollectionProxy:
         return type("UpdateResult", (), {"matched_count": 0, "modified_count": 0, "upserted_id": None})()
 
     # --- aggregate ---
-    def aggregate(self, pipeline: List[dict]):
+    def aggregate(self, pipeline: List[dict], **_ignored):
         return AggregateCursor(self._col, pipeline)
 
     # --- find_one_and_update ---
-    async def find_one_and_update(self, query: dict, update: dict, return_document=None, upsert: bool = False) -> Optional[dict]:
+    async def find_one_and_update(self, query: dict, update: dict, return_document=None, upsert: bool = False, **_ignored) -> Optional[dict]:
         await self.update_one(query, update, upsert=upsert)
         return await self.find_one(query)
 
     # --- distinct ---
-    async def distinct(self, field: str, query: dict = None) -> List:
+    async def distinct(self, field: str, query: dict = None, **_ignored) -> List:
         query = query or {}
         pool = await _get_pool()
         async with pool.acquire() as conn:

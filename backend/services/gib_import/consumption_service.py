@@ -276,3 +276,225 @@ class CustomerConsumptionService:
                 'last_quantity': item.get('last_quantity'),
             })
         return result
+
+    # ============================================================
+    # Year-over-Year (Yıldan Yıla) Karşılaştırma & Trend Analizi
+    # ============================================================
+
+    async def _aggregate_monthly(self, customer_id: str, product_id: str | None = None) -> dict:
+        """
+        Günlük tüketim satırlarını {(year, month, product_id) -> {qty, days}} şeklinde aggregate et.
+        """
+        rows = await self.repository.list_customer_product_daily_consumptions(customer_id, product_id)
+        buckets: dict = {}
+        for row in rows:
+            day = self._parse_date(row.get('date'))
+            if not day:
+                continue
+            pid = row.get('product_id')
+            rate = float(row.get('daily_rate') or 0)
+            key = (day.year, day.month, pid)
+            bucket = buckets.setdefault(key, {'total': 0.0, 'days': 0, 'product_id': pid})
+            bucket['total'] += rate
+            bucket['days'] += 1
+        return buckets
+
+    @staticmethod
+    def _classify_yoy_trend(percentage_change: float) -> str:
+        if percentage_change > 5:
+            return 'growth'
+        if percentage_change < -5:
+            return 'decline'
+        return 'stable'
+
+    async def _resolve_canonical_customer_id(self, customer_id: str) -> str:
+        """
+        Plasiyer hem GİB customer ID'si hem de sf_customer ID'si gönderebilir.
+        Tüketim koleksiyonları daima GİB customer_id ile yazıldığı için kanonik ID'yi döner.
+        Müşteri hiçbir yerde yoksa 404 atar.
+        """
+        customer = await self.repository.find_customer_by_id(customer_id)
+        if customer:
+            return customer_id
+        sf_customer = await self.repository.find_sf_customer_by_customer_id(customer_id)
+        if sf_customer:
+            # sf_customer.customer_id alanı GİB customer ID'sini gösterir (varsa)
+            return sf_customer.get('customer_id') or customer_id
+        # sf_customers'ta id ile de ara — bazı müşteriler henüz GİB tarafına bağlanmamış olabilir
+        sf_by_id = await self.repository.db['sf_customers'].find_one({'id': customer_id}, {'_id': 0})
+        if sf_by_id:
+            return sf_by_id.get('customer_id') or customer_id
+        raise ConsumptionCalculationError('Müşteri bulunamadı', 404)
+
+    async def compare_yoy(self, customer_id: str, product_id: str, year: int, month: int) -> dict:
+        """
+        Belirli bir ay için bu yıl vs geçen yıl karşılaştırması.
+        Müşteri yoksa 404, müşteri var ama veri yoksa sıfırlı yanıt döner.
+        """
+        canonical_id = await self._resolve_canonical_customer_id(customer_id)
+        buckets = await self._aggregate_monthly(canonical_id, product_id)
+        current = buckets.get((year, month, product_id))
+        previous = buckets.get((year - 1, month, product_id))
+
+        products = await self.repository.get_products_by_ids([product_id])
+        product = products.get(product_id, {})
+        product_name = product.get('name') or product.get('product_name') or product_id
+
+        current_total = round(current['total'], 4) if current else 0.0
+        current_daily = round(current['total'] / current['days'], 4) if current else 0.0
+        previous_total = round(previous['total'], 4) if previous else 0.0
+        previous_daily = round(previous['total'] / previous['days'], 4) if previous else 0.0
+
+        if previous_total > 0:
+            absolute_change = round(current_total - previous_total, 4)
+            percentage_change = round((absolute_change / previous_total) * 100, 2)
+            trend = self._classify_yoy_trend(percentage_change)
+        else:
+            absolute_change = current_total
+            percentage_change = 0.0
+            trend = 'no_data' if current_total == 0 else 'new'
+
+        return {
+            'customer_id': canonical_id,
+            'product_id': product_id,
+            'product_name': product_name,
+            'period_type': 'monthly',
+            'period_number': month,
+            'current_year': year,
+            'current_year_consumption': current_total,
+            'current_year_daily_avg': current_daily,
+            'previous_year': year - 1,
+            'previous_year_consumption': previous_total,
+            'previous_year_daily_avg': previous_daily,
+            'absolute_change': absolute_change,
+            'percentage_change': percentage_change,
+            'trend_direction': trend,
+        }
+
+    async def analyze_yearly_trend(self, customer_id: str, product_id: str, year: int) -> dict:
+        """
+        Bir yılın 12 ayı için tüketim dağılımı + peak/lowest + trend yönü.
+        """
+        canonical_id = await self._resolve_canonical_customer_id(customer_id)
+        buckets = await self._aggregate_monthly(canonical_id, product_id)
+        products = await self.repository.get_products_by_ids([product_id])
+        product = products.get(product_id, {})
+        product_name = product.get('name') or product.get('product_name') or product_id
+
+        periods: list = []
+        for month in range(1, 13):
+            bucket = buckets.get((year, month, product_id))
+            if bucket:
+                consumption = round(bucket['total'], 4)
+                daily_avg = round(bucket['total'] / bucket['days'], 4) if bucket['days'] else 0.0
+            else:
+                consumption = 0.0
+                daily_avg = 0.0
+            periods.append({'period': month, 'consumption': consumption, 'daily_avg': daily_avg})
+
+        active = [p for p in periods if p['consumption'] > 0]
+        if not active:
+            return {
+                'customer_id': canonical_id,
+                'product_id': product_id,
+                'product_name': product_name,
+                'period_type': 'monthly',
+                'analysis_year': year,
+                'periods': periods,
+                'total_consumption': 0.0,
+                'average_consumption': 0.0,
+                'peak_period': None,
+                'peak_consumption': 0.0,
+                'lowest_period': None,
+                'lowest_consumption': 0.0,
+                'overall_trend': 'no_data',
+                'trend_percentage': 0.0,
+            }
+
+        total_consumption = sum(p['consumption'] for p in active)
+        average_consumption = total_consumption / len(active)
+        peak = max(active, key=lambda p: p['consumption'])
+        lowest = min(active, key=lambda p: p['consumption'])
+
+        # Trend: ilk çeyrek vs son çeyrek karşılaştırması
+        trend_direction = 'stable'
+        trend_percentage = 0.0
+        if len(active) >= 4:
+            quarter = max(1, len(active) // 4)
+            first_avg = sum(p['consumption'] for p in active[:quarter]) / quarter
+            last_avg = sum(p['consumption'] for p in active[-quarter:]) / quarter
+            if first_avg > 0:
+                trend_percentage = round(((last_avg - first_avg) / first_avg) * 100, 2)
+                if trend_percentage > 15:
+                    trend_direction = 'increasing'
+                elif trend_percentage < -15:
+                    trend_direction = 'decreasing'
+                else:
+                    # Mevsimsellik: yüksek varyans varsa seasonal
+                    consumptions = [p['consumption'] for p in active]
+                    variance = sum((x - average_consumption) ** 2 for x in consumptions) / len(consumptions)
+                    std_dev = variance ** 0.5
+                    if std_dev > average_consumption * 0.3:
+                        trend_direction = 'seasonal'
+
+        return {
+            'customer_id': canonical_id,
+            'product_id': product_id,
+            'product_name': product_name,
+            'period_type': 'monthly',
+            'analysis_year': year,
+            'periods': periods,
+            'total_consumption': round(total_consumption, 4),
+            'average_consumption': round(average_consumption, 4),
+            'peak_period': peak['period'],
+            'peak_consumption': peak['consumption'],
+            'lowest_period': lowest['period'],
+            'lowest_consumption': lowest['consumption'],
+            'overall_trend': trend_direction,
+            'trend_percentage': trend_percentage,
+        }
+
+    async def yoy_overview(self, customer_id: str, year: int, month: int) -> list:
+        """
+        Müşterinin tüm ürünleri için aynı ay'ın yıldan yıla karşılaştırması.
+        Plasiyer dashboard'unda mevsimsel sinyal kartı için kullanılır.
+        Müşteri yoksa 404, müşteri var ama veri yoksa boş liste döner.
+        """
+        canonical_id = await self._resolve_canonical_customer_id(customer_id)
+        buckets = await self._aggregate_monthly(canonical_id, None)
+        product_ids = list({key[2] for key in buckets.keys() if key[2]})
+        products = await self.repository.get_products_by_ids(product_ids) if product_ids else {}
+
+        results: list = []
+        for pid in product_ids:
+            current = buckets.get((year, month, pid))
+            previous = buckets.get((year - 1, month, pid))
+            if not current and not previous:
+                continue
+
+            current_total = round(current['total'], 4) if current else 0.0
+            previous_total = round(previous['total'], 4) if previous else 0.0
+
+            if previous_total > 0:
+                percentage_change = round(((current_total - previous_total) / previous_total) * 100, 2)
+                trend = self._classify_yoy_trend(percentage_change)
+            elif current_total > 0:
+                percentage_change = 0.0
+                trend = 'new'
+            else:
+                percentage_change = 0.0
+                trend = 'no_data'
+
+            product = products.get(pid, {})
+            results.append({
+                'product_id': pid,
+                'product_name': product.get('name') or product.get('product_name') or pid,
+                'current_year_consumption': current_total,
+                'previous_year_consumption': previous_total,
+                'percentage_change': percentage_change,
+                'trend_direction': trend,
+            })
+
+        # En büyük değişimleri (mutlak %) öne al
+        results.sort(key=lambda r: abs(r['percentage_change']), reverse=True)
+        return results

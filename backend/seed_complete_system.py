@@ -273,31 +273,10 @@ async def seed_system():
     
     logger.info(f"   ✅ {invoice_count} fatura oluşturuldu (2024: {len(customer_ids)*6}, 2025: {len(customer_ids)*2})")
     
-    # 4. TÜKETİM HESAPLAMALARI
-    logger.info("\n4. Tüketim hesaplamaları yapılıyor...")
-    
-    from services.consumption_calculation_service import ConsumptionCalculationService
-    
-    consumption_service = ConsumptionCalculationService(db)
-    result = await consumption_service.bulk_calculate_all_invoices()
-    
-    logger.info(f"   ✅ {result['invoices_processed']}/{result['total_invoices']} fatura işlendi")
-    logger.info(f"   ✅ {result['total_consumption_records_created']} tüketim kaydı oluşturuldu")
-    
-    # 5. PERİYODİK KAYITLAR
-    logger.info("\n5. Periyodik kayıtlar oluşturuluyor...")
-    
-    from services.periodic_consumption_service import PeriodicConsumptionService
-    
-    periodic_service = PeriodicConsumptionService(db)
-    
-    # Aylık kayıtlar
-    result_monthly = await periodic_service.generate_periodic_records(period_type="monthly")
-    logger.info(f"   ✅ Aylık: {result_monthly['total']} kayıt oluşturuldu")
-    
-    # Haftalık kayıtlar
-    result_weekly = await periodic_service.generate_periodic_records(period_type="weekly")
-    logger.info(f"   ✅ Haftalık: {result_weekly['total']} kayıt oluşturuldu")
+    # NOT: Eski tüketim hesaplama / periyodik kayıt adımları kaldırıldı.
+    # Tüketim verisi artık GİB import sonrası CustomerConsumptionService
+    # (services/gib_import/consumption_service.py) tarafından üretiliyor.
+    logger.info("\n4-5. Eski tüketim/periyodik kayıt adımları atlandı (GİB akışına devredildi).")
     
     # Final durum
     logger.info("\n" + "=" * 70)
