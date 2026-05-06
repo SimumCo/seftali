@@ -124,9 +124,22 @@ def _build_where(query: Dict, params: List) -> str:
             if value is None:
                 root_key = key.split(".")[0]
                 parts.append(f"({field_expr}) IS NULL OR NOT (doc ? '{root_key}')")
-            else:
+            elif isinstance(value, list):
+                # Direkt array eşitliği
                 params.append(json.dumps(_cast_value(value)))
                 parts.append(f"({field_expr}) = ${len(params)}::jsonb")
+            else:
+                # MongoDB skaler eşitliği: alan skalerse direkt eşitlik,
+                # alan array ise array içinde aranır.
+                cast = _cast_value(value)
+                params.append(json.dumps(cast))
+                scalar_idx = len(params)
+                params.append(json.dumps([cast]))
+                array_idx = len(params)
+                parts.append(
+                    f"(({field_expr}) = ${scalar_idx}::jsonb "
+                    f"OR ({field_expr}) @> ${array_idx}::jsonb)"
+                )
 
     return " AND ".join(parts) if parts else "TRUE"
 
