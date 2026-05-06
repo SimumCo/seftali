@@ -45,14 +45,8 @@ async def _ensure_table(collection: str, conn):
 
 
 def _safe_name(name: str) -> str:
-    """
-    Koleksiyon adını PostgreSQL tablo adına çevirir.
-    Replit'in mevcut tablolarıyla çakışmamak için 'sftl_' prefix kullanır.
-    """
-    clean = re.sub(r"[^a-zA-Z0-9_]", "_", name)
-    if not clean.startswith("sftl_"):
-        clean = "sftl_" + clean
-    return clean
+    """Koleksiyon adını güvenli PostgreSQL tablo adına çevirir."""
+    return re.sub(r"[^a-zA-Z0-9_]", "_", name)
 
 
 # ─── MongoDB Query → SQL WHERE dönüşümü ──────────────────────────────────────

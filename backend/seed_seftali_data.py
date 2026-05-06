@@ -1,6 +1,5 @@
-"""Seed script for SEFTALI module - creates test data."""
+"""SEFTALI modülü için seed scripti - PostgreSQL JSONB adaptörü ile çalışır."""
 import asyncio
-import os
 import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -9,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / ".env")
 
-from motor.motor_asyncio import AsyncIOMotorClient
+from config.database import db
 from utils.auth import hash_password
 import uuid
 
@@ -26,93 +25,105 @@ NOW = datetime.now(timezone.utc)
 
 
 async def main():
-    client = AsyncIOMotorClient(os.environ["MONGO_URL"])
-    db = client[os.environ["DB_NAME"]]
+    print("=" * 60)
+    print("SEFTALI SEED BAŞLIYOR (PostgreSQL)")
+    print("=" * 60)
 
-    # ---- 1. Ensure seftali demo users exist ----
+    # ---- 1. Demo kullanıcılar ----
+    print("\n1. Kullanıcılar...")
     demo_users = [
-        {"username": "sf_musteri", "full_name": "Seftali Musteri A", "role": "customer", "pw": "musteri123"},
-        {"username": "sf_musteri2", "full_name": "Seftali Musteri B", "role": "customer", "pw": "musteri123"},
-        {"username": "sf_satici", "full_name": "Seftali Satici", "role": "sales_rep", "pw": "satici123"},
-        {"username": "sf_plasiyer", "full_name": "Seftali Plasiyer", "role": "sales_agent", "pw": "plasiyer123"},
+        {"username": "admin", "full_name": "Sistem Yöneticisi", "role": "admin", "pw": "admin123",
+         "email": "admin@seftali.com"},
+        {"username": "muhasebe", "full_name": "Muhasebe Personeli", "role": "accounting", "pw": "muhasebe123",
+         "email": "muhasebe@seftali.com"},
+        {"username": "sf_musteri", "full_name": "Müşteri A - Market", "role": "customer", "pw": "musteri123",
+         "email": "musteria@seftali.com"},
+        {"username": "sf_musteri2", "full_name": "Müşteri B - Restoran", "role": "customer", "pw": "musteri123",
+         "email": "musterib@seftali.com"},
+        {"username": "sf_satici", "full_name": "Şeftali Satıcı", "role": "sales_rep", "pw": "satici123",
+         "email": "satici@seftali.com"},
+        {"username": "plasiyer1", "full_name": "Plasiyer 1", "role": "sales_agent", "pw": "plasiyer123",
+         "email": "plasiyer@seftali.com"},
     ]
     user_ids = {}
     for u in demo_users:
-        existing = await db.users.find_one({"username": u["username"]}, {"_id": 0})
+        existing = await db['users'].find_one({"username": u["username"]})
         if existing:
             user_ids[u["username"]] = existing["id"]
-            print(f"  User {u['username']} already exists")
+            print(f"   - {u['username']} mevcut")
         else:
             uid = gid()
-            await db.users.insert_one({
+            await db['users'].insert_one({
                 "id": uid, "username": u["username"], "password_hash": hash_password(u["pw"]),
-                "full_name": u["full_name"], "role": u["role"], "is_active": True,
+                "full_name": u["full_name"], "email": u["email"], "phone": "",
+                "role": u["role"], "is_active": True,
                 "created_at": iso(NOW),
             })
             user_ids[u["username"]] = uid
-            print(f"  Created user {u['username']}")
+            print(f"   + {u['username']} oluşturuldu ({u['role']})")
 
-    # ---- 2. SF Products ----
+    # ---- 2. Ürünler ----
+    print("\n2. Ürünler...")
     products = [
-        {"id": gid(), "code": "AYR_BRD", "name": "Ayran Bardak", "shelf_life_days": 21},
-        {"id": gid(), "code": "YOG_KOV", "name": "Yogurt Kova", "shelf_life_days": 28},
-        {"id": gid(), "code": "SUZ_YOG", "name": "Suzme Yogurt", "shelf_life_days": 14},
-        {"id": gid(), "code": "AYR_PET", "name": "Ayran Pet Sise", "shelf_life_days": 30},
+        {"id": gid(), "code": "AYR_BRD", "name": "Ayran Bardak", "shelf_life_days": 21, "unit": "adet", "price": 5.0},
+        {"id": gid(), "code": "YOG_KOV", "name": "Yoğurt Kova", "shelf_life_days": 28, "unit": "kg", "price": 45.0},
+        {"id": gid(), "code": "SUZ_YOG", "name": "Süzme Yoğurt", "shelf_life_days": 14, "unit": "kg", "price": 65.0},
+        {"id": gid(), "code": "AYR_PET", "name": "Ayran Pet Şişe", "shelf_life_days": 30, "unit": "adet", "price": 8.0},
+        {"id": gid(), "code": "SUT_LT",  "name": "Süt 1 Litre",   "shelf_life_days": 7,  "unit": "lt",   "price": 25.0},
     ]
-    existing_count = await db.sf_products.count_documents({})
+    existing_count = await db['sf_products'].count_documents({})
     if existing_count == 0:
         for p in products:
             p["created_at"] = iso(NOW)
             p["updated_at"] = iso(NOW)
-        await db.sf_products.insert_many(products)
-        print(f"  Created {len(products)} sf_products")
+            p["is_active"] = True
+            await db['sf_products'].insert_one(p)
+        print(f"   + {len(products)} ürün oluşturuldu")
     else:
-        print(f"  sf_products already exist ({existing_count})")
-        cursor = db.sf_products.find({}, {"_id": 0, "id": 1, "code": 1})
-        products = await cursor.to_list(100)
+        print(f"   - {existing_count} ürün mevcut")
 
     prod_map = {}
-    cursor = db.sf_products.find({}, {"_id": 0})
-    for p in await cursor.to_list(100):
+    for p in await db['sf_products'].find({}).to_list(100):
         prod_map[p["code"]] = p["id"]
 
-    # ---- 3. SF Customers ----
+    # ---- 3. Müşteriler ----
+    print("\n3. Müşteriler...")
     cust_a_id = gid()
     cust_b_id = gid()
     sf_customers = [
         {
             "id": cust_a_id, "user_id": user_ids["sf_musteri"],
-            "name": "Musteri A - Market", "route_plan": {"days": ["MON", "FRI"], "effective_from_week": "2025-W01"},
+            "name": "Müşteri A - Market",
+            "route_plan": {"days": ["MON", "FRI"], "effective_from_week": "2025-W01"},
             "is_active": True, "created_at": iso(NOW), "updated_at": iso(NOW),
         },
         {
             "id": cust_b_id, "user_id": user_ids["sf_musteri2"],
-            "name": "Musteri B - Restoran", "route_plan": {"days": ["TUE", "THU"], "effective_from_week": "2025-W01"},
+            "name": "Müşteri B - Restoran",
+            "route_plan": {"days": ["TUE", "THU"], "effective_from_week": "2025-W01"},
             "is_active": True, "created_at": iso(NOW), "updated_at": iso(NOW),
         },
     ]
-    existing_custs = await db.sf_customers.count_documents({})
+    existing_custs = await db['sf_customers'].count_documents({})
     if existing_custs == 0:
-        await db.sf_customers.insert_many(sf_customers)
-        print(f"  Created {len(sf_customers)} sf_customers")
+        for c in sf_customers:
+            await db['sf_customers'].insert_one(c)
+        print(f"   + {len(sf_customers)} müşteri oluşturuldu")
     else:
-        print(f"  sf_customers already exist ({existing_custs})")
-        c = await db.sf_customers.find_one({"user_id": user_ids["sf_musteri"]}, {"_id": 0})
+        print(f"   - {existing_custs} müşteri mevcut")
+        c = await db['sf_customers'].find_one({"user_id": user_ids["sf_musteri"]})
         if c:
             cust_a_id = c["id"]
 
-    # ---- 4. Sample deliveries for Musteri A ----
-    existing_dlv = await db.sf_deliveries.count_documents({})
+    # ---- 4. Örnek teslimatlar ----
+    print("\n4. Teslimatlar...")
+    existing_dlv = await db['sf_deliveries'].count_documents({})
     if existing_dlv == 0:
-        d1_id = gid()
-        d2_id = gid()
-        d3_id = gid()
         seven_days_ago = NOW - timedelta(days=7)
         two_days_ago = NOW - timedelta(days=2)
-
         deliveries = [
             {
-                "id": d1_id, "customer_id": cust_a_id,
+                "id": gid(), "customer_id": cust_a_id,
                 "created_by_salesperson_id": user_ids["sf_satici"],
                 "delivery_type": "route", "delivered_at": iso(seven_days_ago),
                 "invoice_no": "FTR-001", "acceptance_status": "pending",
@@ -124,7 +135,7 @@ async def main():
                 "created_at": iso(seven_days_ago), "updated_at": iso(seven_days_ago),
             },
             {
-                "id": d2_id, "customer_id": cust_a_id,
+                "id": gid(), "customer_id": cust_a_id,
                 "created_by_salesperson_id": user_ids["sf_satici"],
                 "delivery_type": "route", "delivered_at": iso(two_days_ago),
                 "invoice_no": "FTR-002", "acceptance_status": "pending",
@@ -136,7 +147,7 @@ async def main():
                 "created_at": iso(two_days_ago), "updated_at": iso(two_days_ago),
             },
             {
-                "id": d3_id, "customer_id": cust_a_id,
+                "id": gid(), "customer_id": cust_a_id,
                 "created_by_salesperson_id": user_ids["sf_satici"],
                 "delivery_type": "off_route", "delivered_at": iso(NOW),
                 "invoice_no": "FTR-003", "acceptance_status": "pending",
@@ -147,39 +158,36 @@ async def main():
                 "created_at": iso(NOW), "updated_at": iso(NOW),
             },
         ]
-        await db.sf_deliveries.insert_many(deliveries)
-        print(f"  Created {len(deliveries)} sf_deliveries")
+        for d in deliveries:
+            await db['sf_deliveries'].insert_one(d)
+        print(f"   + {len(deliveries)} teslimat oluşturuldu")
     else:
-        print(f"  sf_deliveries already exist ({existing_dlv})")
+        print(f"   - {existing_dlv} teslimat mevcut")
 
-    # ---- 5. Create indexes ----
-    print("\n  Creating indexes...")
-    await db.sf_customers.create_index("user_id", unique=True)
-    await db.sf_customers.create_index("is_active")
-    await db.sf_products.create_index("code", unique=True)
-    await db.sf_deliveries.create_index([("customer_id", 1), ("delivered_at", -1)])
-    await db.sf_deliveries.create_index("acceptance_status")
-    await db.sf_deliveries.create_index([("customer_id", 1), ("acceptance_status", 1)])
-    await db.sf_stock_declarations.create_index([("customer_id", 1), ("declared_at", -1)])
-    await db.sf_consumption_stats.create_index([("customer_id", 1), ("product_id", 1)], unique=True)
-    await db.sf_consumption_stats.create_index([("customer_id", 1), ("spike.detected_at", -1)])
-    await db.sf_working_copies.create_index([("customer_id", 1), ("status", 1)])
-    await db.sf_variance_events.create_index([("customer_id", 1), ("status", 1)])
-    await db.sf_variance_events.create_index([("customer_id", 1), ("product_id", 1), ("detected_at", -1)])
-    await db.sf_variance_events.create_index(
-        [("trigger.type", 1), ("trigger.ref_id", 1), ("product_id", 1)], unique=True
-    )
-    print("  Indexes created!")
+    # ---- 5. Sistem ayarları ----
+    print("\n5. Sistem ayarları...")
+    existing_settings = await db['sf_system_settings'].find_one({"type": "order_settings"})
+    if not existing_settings:
+        await db['sf_system_settings'].insert_one({
+            "id": gid(), "type": "order_settings",
+            "order_cutoff_hour": 16, "order_cutoff_minute": 30,
+            "auto_draft_enabled": True,
+            "created_at": iso(NOW),
+        })
+        print("   + Order settings oluşturuldu")
+    else:
+        print("   - Order settings mevcut")
 
-    print("\n=== SEFTALI seed complete ===")
-    print("Demo credentials:")
-    print("  Musteri:   sf_musteri / musteri123")
-    print("  Musteri2:  sf_musteri2 / musteri123")
-    print("  Satici:    sf_satici / satici123")
-    print("  Plasiyer:  sf_plasiyer / plasiyer123")
+    print("\n" + "=" * 60)
+    print("SEED TAMAMLANDI!")
+    print("=" * 60)
+    print("\nGiriş bilgileri:")
     print("  Admin:     admin / admin123")
-
-    client.close()
+    print("  Muhasebe:  muhasebe / muhasebe123")
+    print("  Müşteri A: sf_musteri / musteri123")
+    print("  Müşteri B: sf_musteri2 / musteri123")
+    print("  Satıcı:    sf_satici / satici123")
+    print("  Plasiyer:  plasiyer1 / plasiyer123")
 
 
 if __name__ == "__main__":

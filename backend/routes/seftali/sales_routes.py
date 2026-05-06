@@ -114,7 +114,7 @@ async def add_campaign_to_order(
     - discount: Sadece ürün eklenir (indirimli fiyatla)
     - gift: Ürün + hediye ürünü eklenir
     """
-    from services.seftali.utils import now_utc, to_iso
+    from services.seftali.core import now_utc, to_iso
     
     # Kampanya kontrolü
     campaign = await db["sf_campaigns"].find_one(

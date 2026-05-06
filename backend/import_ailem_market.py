@@ -188,7 +188,7 @@ async def main():
     # Import services
     from services.seftali.consumption_service import ConsumptionService
     from services.seftali.draft_service import DraftService
-    from services.seftali.utils import to_iso, now_utc, COL_DELIVERIES, COL_WORKING_COPIES, COL_AUDIT_EVENTS
+    from services.seftali.core import to_iso, now_utc, COL_DELIVERIES, COL_WORKING_COPIES, COL_AUDIT_EVENTS
 
     for idx, inv in enumerate(INVOICES):
         dlv_id = gid()

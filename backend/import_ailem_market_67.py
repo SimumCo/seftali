@@ -60,7 +60,7 @@ async def main():
 
     from services.seftali.consumption_service import ConsumptionService
     from services.seftali.draft_service import DraftService
-    from services.seftali.utils import COL_WORKING_COPIES, COL_AUDIT_EVENTS
+    from services.seftali.core import COL_WORKING_COPIES, COL_AUDIT_EVENTS
 
     # Get customer
     customer = await db.sf_customers.find_one({"name": "AILEM MARKET GURBET DURMUS"}, {"_id": 0})

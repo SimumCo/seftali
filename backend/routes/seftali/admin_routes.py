@@ -133,7 +133,7 @@ async def process_warehouse_order(
     """
     Depo siparişini işlendi olarak işaretle.
     """
-    from services.seftali.utils import now_utc, to_iso
+    from services.seftali.core import now_utc, to_iso
     
     order = await db["warehouse_orders"].find_one({"id": order_id}, {"_id": 0})
     if not order:
@@ -200,7 +200,7 @@ async def list_campaigns(
     current_user=Depends(require_role([UserRole.ADMIN])),
 ):
     """Tüm kampanyaları listele"""
-    from services.seftali.utils import now_utc
+    from services.seftali.core import now_utc
     
     filt = {}
     if status:
@@ -231,7 +231,7 @@ async def create_campaign(
     current_user=Depends(require_role([UserRole.ADMIN])),
 ):
     """Yeni kampanya oluştur"""
-    from services.seftali.utils import now_utc, to_iso
+    from services.seftali.core import now_utc, to_iso
     
     campaign_id = str(uuid.uuid4())
     
@@ -274,7 +274,7 @@ async def update_campaign(
 ):
     """Kampanya güncelle"""
     from fastapi import HTTPException
-    from services.seftali.utils import now_utc, to_iso
+    from services.seftali.core import now_utc, to_iso
     
     campaign = await db[COL_CAMPAIGNS].find_one({"id": campaign_id}, {"_id": 0})
     if not campaign:
