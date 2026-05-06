@@ -7,10 +7,9 @@ import { toast } from 'sonner';
 import {
   Map, List, Navigation, Phone, MessageCircle,
   RefreshCw, Check, Clock, ChevronRight, X,
-  Route, MapPin, Zap,
+  MapPin, Zap,
 } from 'lucide-react';
 
-// Leaflet ikon düzeltmesi (CRA'da gerekli)
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
@@ -23,7 +22,8 @@ const dayLabels = {
   THU: 'Perşembe', FRI: 'Cuma', SAT: 'Cumartesi', SUN: 'Pazar',
 };
 
-// ─── Özel renkli harita ikonu ────────────────────────────────────────────────
+const monthsTr = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+
 function createMarkerIcon(order, isVisited) {
   const bg = isVisited ? '#10b981' : '#f97316';
   const html = `
@@ -40,7 +40,6 @@ function createMarkerIcon(order, isVisited) {
   return L.divIcon({ className: '', html, iconSize: [34, 34], iconAnchor: [17, 34], popupAnchor: [0, -36] });
 }
 
-// ─── Harita sınırlarını otomatik ayarla ──────────────────────────────────────
 function AutoFitBounds({ positions }) {
   const map = useMap();
   useEffect(() => {
@@ -54,12 +53,106 @@ function AutoFitBounds({ positions }) {
   return null;
 }
 
-// ─── Ana Bileşen ─────────────────────────────────────────────────────────────
+// ─── Sayılı kare rozet ────────────────────────────────────────────────────────
+const OrderBadge = ({ order, variant = 'pending' }) => {
+  const cls = variant === 'visited'
+    ? 'bg-emerald-500 text-white'
+    : 'bg-orange-500 text-white';
+  return (
+    <div className={`flex-shrink-0 w-11 h-11 rounded-lg flex items-center justify-center text-base font-bold shadow-sm ${cls}`}>
+      {order}
+    </div>
+  );
+};
+
+// ─── Tek satır müşteri kartı ──────────────────────────────────────────────────
+const RouteListItem = ({ customer, variant, onClick, testId }) => {
+  const isVisited = variant === 'visited';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full flex items-center gap-4 px-4 py-3.5 bg-white hover:bg-slate-50 transition-colors text-left border-b border-slate-100 last:border-b-0"
+      data-testid={testId}
+    >
+      <OrderBadge order={customer.visit_order} variant={variant} />
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-slate-900 truncate" data-testid={`${testId}-name`}>
+          {customer.name}
+        </p>
+        <p className="text-sm text-slate-400 truncate">
+          {customer.district || customer.address || 'Konum yok'}
+        </p>
+      </div>
+      <div className="flex-shrink-0">
+        {isVisited
+          ? <Check className="w-5 h-5 text-emerald-500" />
+          : <ChevronRight className="w-5 h-5 text-orange-500" />}
+      </div>
+    </button>
+  );
+};
+
+// ─── Liste bölümü ─────────────────────────────────────────────────────────────
+const RouteSection = ({ title, accentColor, customers, variant, onItemClick, emptyText, testId }) => {
+  if (customers.length === 0) return null;
+  const headerBg = accentColor === 'orange'
+    ? 'bg-orange-50 text-orange-700 border-orange-100'
+    : 'bg-emerald-50 text-emerald-700 border-emerald-100';
+  return (
+    <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden" data-testid={testId}>
+      <div className={`px-4 py-2.5 text-sm font-semibold border-b ${headerBg}`}>
+        {title}
+      </div>
+      <div>
+        {customers.map((c) => (
+          <RouteListItem
+            key={c.id}
+            customer={c}
+            variant={variant}
+            onClick={() => onItemClick(c)}
+            testId={`route-item-${c.id}`}
+          />
+        ))}
+      </div>
+      {customers.length === 0 && (
+        <div className="p-6 text-center text-sm text-slate-400">{emptyText}</div>
+      )}
+    </section>
+  );
+};
+
+// ─── Segmentli özet barı ──────────────────────────────────────────────────────
+const RouteSummaryBar = ({ pending, visited }) => {
+  const total = Math.max(pending + visited, 1);
+  const pendingPct = (pending / total) * 100;
+  const visitedPct = 100 - pendingPct;
+  return (
+    <div className="flex w-full rounded-xl overflow-hidden shadow-sm" data-testid="route-summary-bar">
+      <div
+        className="bg-orange-500 text-white px-4 py-2.5 text-sm font-semibold flex items-center justify-center transition-all"
+        style={{ width: `${Math.max(pendingPct, 18)}%` }}
+        data-testid="summary-pending"
+      >
+        Bekleyen: {pending} Nokta
+      </div>
+      <div
+        className="bg-emerald-500 text-white px-4 py-2.5 text-sm font-semibold flex items-center justify-center transition-all"
+        style={{ width: `${Math.max(visitedPct, 18)}%` }}
+        data-testid="summary-visited"
+      >
+        Gidilen: {visited} Nokta
+      </div>
+    </div>
+  );
+};
+
+// ─── Ana Bileşen ──────────────────────────────────────────────────────────────
 const RouteMapPage = ({ routeDay = 'MON' }) => {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [optimizing, setOptimizing] = useState(false);
-  const [activeView, setActiveView] = useState('map'); // 'map' | 'list'
+  const [activeView, setActiveView] = useState('list');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [visitedIds, setVisitedIds] = useState(new Set());
   const [totalDistance, setTotalDistance] = useState(null);
@@ -76,7 +169,7 @@ const RouteMapPage = ({ routeDay = 'MON' }) => {
       }));
       setCustomers(list);
       setTotalDistance(data.total_distance_km ?? null);
-      if (optimize) toast.success(`Rota optimize edildi! Toplam ~${data.total_distance_km?.toFixed(1)} km`);
+      if (optimize) toast.success(`Rota optimize edildi! ~${data.total_distance_km?.toFixed(1)} km`);
     } catch {
       toast.error('Rota verisi yüklenemedi');
     } finally {
@@ -85,9 +178,7 @@ const RouteMapPage = ({ routeDay = 'MON' }) => {
     }
   }, [routeDay]);
 
-  useEffect(() => {
-    fetchRoute(false);
-  }, [fetchRoute]);
+  useEffect(() => { fetchRoute(false); }, [fetchRoute]);
 
   const toggleVisited = (customerId) => {
     setVisitedIds(prev => {
@@ -97,7 +188,9 @@ const RouteMapPage = ({ routeDay = 'MON' }) => {
       return next;
     });
     const c = customers.find(x => x.id === customerId);
-    if (c) toast.success(visitedIds.has(customerId) ? `${c.name} bekleyene alındı` : `${c.name} gidildi olarak işaretlendi`);
+    if (c) toast.success(visitedIds.has(customerId)
+      ? `${c.name} bekleyene alındı`
+      : `${c.name} gidildi olarak işaretlendi`);
   };
 
   const openGoogleMaps = (customer) => {
@@ -122,28 +215,39 @@ const RouteMapPage = ({ routeDay = 'MON' }) => {
     window.open(`tel:${phone}`, '_self');
   };
 
-  // Hesaplanan değerler
   const sortedCustomers = useMemo(
     () => [...customers].sort((a, b) => a.visit_order - b.visit_order),
     [customers]
+  );
+
+  const pendingCustomers = useMemo(
+    () => sortedCustomers.filter(c => !visitedIds.has(c.id)),
+    [sortedCustomers, visitedIds]
+  );
+  const visitedCustomers = useMemo(
+    () => sortedCustomers.filter(c => visitedIds.has(c.id)),
+    [sortedCustomers, visitedIds]
   );
 
   const mappedCustomers = useMemo(
     () => sortedCustomers.filter(c => c.location?.lat != null && c.location?.lng != null),
     [sortedCustomers]
   );
-
   const positions = useMemo(
     () => mappedCustomers.map(c => [c.location.lat, c.location.lng]),
     [mappedCustomers]
   );
-
-  const visitedCount = useMemo(() => [...visitedIds].filter(id => customers.find(c => c.id === id)).length, [visitedIds, customers]);
-  const pendingCount = customers.length - visitedCount;
-  const progressPct = customers.length > 0 ? Math.round((visitedCount / customers.length) * 100) : 0;
-
-  // Default harita merkezi (İstanbul)
   const mapCenter = positions.length > 0 ? positions[0] : [41.0082, 28.9784];
+
+  // Tarih başlık metni: "6 Mayıs Çarşamba - 14 nokta"
+  const headerSubtitle = useMemo(() => {
+    const today = new Date();
+    const dayCode = ['SUN','MON','TUE','WED','THU','FRI','SAT'][today.getDay()];
+    const dateStr = dayCode === routeDay
+      ? `${today.getDate()} ${monthsTr[today.getMonth()]} ${dayLabels[routeDay]}`
+      : dayLabels[routeDay];
+    return `${dateStr} • ${customers.length} nokta`;
+  }, [routeDay, customers.length]);
 
   if (loading) {
     return (
@@ -155,91 +259,96 @@ const RouteMapPage = ({ routeDay = 'MON' }) => {
   }
 
   return (
-    <div className="space-y-4" data-testid="route-map-page">
+    <div className="space-y-5" data-testid="route-map-page">
 
-      {/* ─── Başlık & İstatistikler ─── */}
-      <div className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl p-5 text-white" data-testid="route-map-header">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h1 className="text-xl font-bold flex items-center gap-2">
-              <Route className="w-5 h-5" />
-              Rota Haritası
-            </h1>
-            <p className="text-orange-100 text-sm mt-0.5">
-              {dayLabels[routeDay]} · {customers.length} durak
-              {totalDistance != null && ` · ~${totalDistance.toFixed(1)} km`}
-            </p>
+      {/* ─── Sayfa Başlığı ─── */}
+      <div className="flex items-start justify-between gap-3 flex-wrap" data-testid="route-page-header">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Bugünün Noktaları</h1>
+          <p className="text-sm text-slate-500 mt-1" data-testid="route-page-subtitle">
+            {headerSubtitle}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Görünüm Seçici */}
+          <div className="inline-flex bg-slate-100 rounded-xl p-1 gap-1">
+            <button
+              onClick={() => setActiveView('list')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                activeView === 'list' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+              }`}
+              data-testid="view-list-button"
+            >
+              <List className="w-4 h-4" /> Liste
+            </button>
+            <button
+              onClick={() => setActiveView('map')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                activeView === 'map' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+              }`}
+              data-testid="view-map-button"
+            >
+              <Map className="w-4 h-4" /> Harita
+            </button>
           </div>
 
           <button
             onClick={() => fetchRoute(true)}
-            disabled={optimizing}
-            className="flex items-center gap-2 px-3 py-2 bg-white/20 hover:bg-white/30 rounded-xl text-sm font-medium transition-colors"
+            disabled={optimizing || customers.length === 0}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-slate-900 text-white disabled:opacity-50 hover:bg-slate-800 transition-colors"
             data-testid="optimize-route-button"
           >
             {optimizing
               ? <RefreshCw className="w-4 h-4 animate-spin" />
               : <Zap className="w-4 h-4" />}
-            {optimizing ? 'Optimize ediliyor...' : 'Optimize Et'}
+            Optimize
           </button>
         </div>
-
-        {/* İlerleme Barı */}
-        <div className="flex items-center gap-3">
-          <div className="flex-1 bg-white/20 rounded-full h-2.5 overflow-hidden">
-            <div
-              className="bg-white h-full rounded-full transition-all duration-500"
-              style={{ width: `${progressPct}%` }}
-              data-testid="route-progress-bar"
-            />
-          </div>
-          <span className="text-sm font-semibold whitespace-nowrap" data-testid="route-progress-label">
-            {visitedCount}/{customers.length} tamamlandı
-          </span>
-        </div>
-
-        {/* Özet Kutuları */}
-        <div className="grid grid-cols-3 gap-2 mt-3">
-          <div className="bg-white/15 rounded-xl p-2 text-center">
-            <p className="text-xs text-orange-100">Bekleyen</p>
-            <p className="text-lg font-bold" data-testid="pending-count">{pendingCount}</p>
-          </div>
-          <div className="bg-white/15 rounded-xl p-2 text-center">
-            <p className="text-xs text-orange-100">Gidilen</p>
-            <p className="text-lg font-bold" data-testid="visited-count">{visitedCount}</p>
-          </div>
-          <div className="bg-white/15 rounded-xl p-2 text-center">
-            <p className="text-xs text-orange-100">Haritada</p>
-            <p className="text-lg font-bold" data-testid="mapped-count">{mappedCustomers.length}</p>
-          </div>
-        </div>
       </div>
 
-      {/* ─── Görünüm Seçici ─── */}
-      <div className="inline-flex bg-slate-100 rounded-2xl p-1 gap-1" data-testid="view-switcher">
-        <button
-          onClick={() => setActiveView('map')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-            activeView === 'map' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
-          }`}
-          data-testid="view-map-button"
-        >
-          <Map className="w-4 h-4" /> Harita
-        </button>
-        <button
-          onClick={() => setActiveView('list')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-            activeView === 'list' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
-          }`}
-          data-testid="view-list-button"
-        >
-          <List className="w-4 h-4" /> Liste
-        </button>
-      </div>
+      {/* ─── Segmentli Özet Bar ─── */}
+      {customers.length > 0 && (
+        <RouteSummaryBar
+          pending={pendingCustomers.length}
+          visited={visitedCustomers.length}
+        />
+      )}
+
+      {/* ─── Liste Görünümü ─── */}
+      {activeView === 'list' && (
+        <div className="space-y-4" data-testid="route-list">
+          {customers.length === 0 ? (
+            <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center text-slate-400">
+              <MapPin className="w-10 h-10 mx-auto mb-3 text-slate-300" />
+              Bu gün için rota müşterisi bulunamadı.
+            </div>
+          ) : (
+            <>
+              <RouteSection
+                title="Bekleyen Noktalar"
+                accentColor="orange"
+                customers={pendingCustomers}
+                variant="pending"
+                onItemClick={setSelectedCustomer}
+                testId="section-pending"
+              />
+              <RouteSection
+                title="Gidilmiş Noktalar"
+                accentColor="green"
+                customers={visitedCustomers}
+                variant="visited"
+                onItemClick={setSelectedCustomer}
+                testId="section-visited"
+              />
+            </>
+          )}
+        </div>
+      )}
 
       {/* ─── Harita Görünümü ─── */}
       {activeView === 'map' && (
-        <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm" style={{ height: '480px' }} data-testid="leaflet-map-container">
+        <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm" style={{ height: '560px' }} data-testid="leaflet-map-container">
           {mappedCustomers.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full bg-slate-50 gap-3">
               <MapPin className="w-12 h-12 text-slate-300" />
@@ -257,18 +366,13 @@ const RouteMapPage = ({ routeDay = 'MON' }) => {
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               />
-
               <AutoFitBounds positions={positions} />
-
-              {/* Rota çizgisi */}
               {positions.length > 1 && (
                 <Polyline
                   positions={positions}
                   pathOptions={{ color: '#f97316', weight: 3, opacity: 0.7, dashArray: '6 4' }}
                 />
               )}
-
-              {/* Müşteri işaretleri */}
               {mappedCustomers.map(c => {
                 const isVisited = visitedIds.has(c.id);
                 return (
@@ -295,55 +399,11 @@ const RouteMapPage = ({ routeDay = 'MON' }) => {
               })}
             </MapContainer>
           )}
-        </div>
-      )}
-
-      {/* ─── Liste Görünümü ─── */}
-      {activeView === 'list' && (
-        <div className="space-y-2" data-testid="route-list">
-          {sortedCustomers.length === 0 && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-400">
-              Bu gün için rota müşterisi bulunamadı.
-            </div>
+          {totalDistance != null && (
+            <p className="text-xs text-slate-500 mt-2 text-right">
+              Toplam tahmini mesafe: ~{totalDistance.toFixed(1)} km
+            </p>
           )}
-          {sortedCustomers.map((c) => {
-            const isVisited = visitedIds.has(c.id);
-            const hasCoords = c.location?.lat != null;
-            return (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setSelectedCustomer(c)}
-                className={`w-full flex items-center gap-4 px-5 py-4 bg-white border rounded-2xl text-left transition-colors ${
-                  isVisited ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-200'
-                }`}
-                data-testid={`route-list-item-${c.id}`}
-              >
-                {/* Sıra Numarası */}
-                <div className={`flex-shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-bold ${
-                  isVisited ? 'bg-emerald-500 text-white' : 'bg-orange-500 text-white'
-                }`}>
-                  {isVisited ? <Check className="w-4 h-4" /> : c.visit_order}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-slate-900 truncate">{c.name}</p>
-                  <p className="text-sm text-slate-400 truncate">
-                    {c.district || c.address || 'Konum bilgisi yok'}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {!hasCoords && (
-                    <span className="text-xs text-amber-500 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                      Koordinat yok
-                    </span>
-                  )}
-                  <ChevronRight className="w-4 h-4 text-slate-400" />
-                </div>
-              </button>
-            );
-          })}
         </div>
       )}
 
@@ -375,7 +435,6 @@ const CustomerDrawer = ({ customer, isVisited, onClose, onToggleVisited, onNavig
       onClick={e => e.stopPropagation()}
       data-testid="customer-drawer"
     >
-      {/* Başlık */}
       <div className="flex items-start justify-between p-5 border-b border-slate-100">
         <div>
           <span className="text-xs font-semibold uppercase tracking-widest text-slate-400">Durak Detayı</span>
@@ -391,7 +450,6 @@ const CustomerDrawer = ({ customer, isVisited, onClose, onToggleVisited, onNavig
         </button>
       </div>
 
-      {/* Durum Rozeti */}
       <div className="px-5 pt-4">
         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold ${
           isVisited ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'
@@ -401,7 +459,6 @@ const CustomerDrawer = ({ customer, isVisited, onClose, onToggleVisited, onNavig
         </span>
       </div>
 
-      {/* Bilgi Alanları */}
       <div className="p-5 space-y-3">
         <InfoField label="Adres" value={customer.address || 'Adres bilgisi yok'} />
         <InfoField label="İlçe" value={customer.district || 'Belirtilmemiş'} />
@@ -415,7 +472,6 @@ const CustomerDrawer = ({ customer, isVisited, onClose, onToggleVisited, onNavig
         )}
       </div>
 
-      {/* Aksiyon Butonları */}
       <div className="p-5 space-y-3 border-t border-slate-100">
         <button
           onClick={onNavigate}

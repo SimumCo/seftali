@@ -240,7 +240,7 @@ class OrderService:
     async def _get_route_customers(cls, salesperson_id: str, route_day: str) -> List[dict]:
         """Rota müşterilerini getir."""
         cursor = db[COL_CUSTOMERS].find({
-            "salesperson_id": salesperson_id,
+            "user_id": salesperson_id,
             "is_active": True,
             "route_plan.days": route_day
         }, {"_id": 0})

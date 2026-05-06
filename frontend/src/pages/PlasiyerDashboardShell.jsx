@@ -20,7 +20,6 @@ import {
 } from '../components/ui/DesignSystem';
 
 // Import Plasiyer Page Components
-import RutPage from '../components/plasiyer/RutPage';
 import WarehouseDraftPage from '../components/plasiyer/WarehouseDraftPage';
 import CustomerCard, { CustomerDetailModal } from '../components/plasiyer/CustomerCard';
 import OrdersPage from '../components/plasiyer/OrdersPage';
@@ -241,7 +240,7 @@ const PlasiyerDashboardShell = () => {
   // Sidebar navigation items
   const sidebarItems = [
     { id: 'dashboard', label: 'Ana Sayfa', icon: Home },
-    { id: 'harita', label: 'Rota Haritası', icon: Map },
+    { id: 'harita', label: 'Rut', icon: Map },
     { id: 'akilli-siparis', label: 'Smart Orders', icon: Package },
     { id: 'customers', label: 'Musteriler', icon: Users },
     { id: 'orders', label: 'Siparisler', icon: ShoppingBag, badge: stats.pendingOrders },
@@ -272,8 +271,6 @@ const PlasiyerDashboardShell = () => {
         );
       case 'harita':
         return <RouteMapPage routeDay={todayCode} />;
-      case 'rut':
-        return <RutPage routeDay={todayCode} todayCustomers={todayCustomers} />;
       case 'akilli-siparis':
         return <WarehouseDraftPage />;
       case 'orders':
