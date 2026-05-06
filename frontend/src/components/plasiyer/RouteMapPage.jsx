@@ -158,6 +158,7 @@ const RouteMapPage = ({ routeDay = 'MON' }) => {
   const [actionItem, setActionItem] = useState(null);
   const [statusMap, setStatusMap] = useState({}); // { [id]: { status, visit_result, visited_at } }
   const [totalDistance, setTotalDistance] = useState(null);
+  const [smartOrderingEnabled, setSmartOrderingEnabled] = useState(true);
 
   const fetchRoute = useCallback(async (optimize = false) => {
     if (optimize) setOptimizing(true);
@@ -168,9 +169,11 @@ const RouteMapPage = ({ routeDay = 'MON' }) => {
       const list = (data.customers || []).map((c, idx) => ({
         ...c,
         visit_order: c.visit_order || idx + 1,
+        suggested_visit_order: c.suggested_visit_order || c.visit_order || idx + 1,
       }));
       setCustomers(list);
       setTotalDistance(data.total_distance_km ?? null);
+      setSmartOrderingEnabled(data.smart_ordering_enabled !== false);
       if (optimize) toast.success(`Rota optimize edildi! ~${data.total_distance_km?.toFixed(1)} km`);
     } catch {
       toast.error('Rota verisi yüklenemedi');
@@ -205,13 +208,27 @@ const RouteMapPage = ({ routeDay = 'MON' }) => {
 
   // RouteActionModal onaylandığında durumu güncelle
   const handleActionConfirm = (customerId, update) => {
+    const visitedAt = update.status === 'visited' ? new Date().toISOString() : null;
     const next = {
       status: update.status,
       visit_result: update.visit_result,
-      visited_at: update.status === 'visited' ? new Date().toISOString() : null,
+      visited_at: visitedAt,
     };
     setStatusMap(prev => ({ ...prev, [customerId]: next }));
     setActionItem(null);
+
+    // Geçmiş kaydı (fire-and-forget) — sadece gerçek ziyaretler persist edilir
+    if (update.visit_result === 'visited' || update.visit_result === 'visited_without_invoice') {
+      const c = customers.find(x => x.id === customerId);
+      sfSalesAPI.recordRouteVisit({
+        customer_id: customerId,
+        route_day: routeDay,
+        visit_result: update.visit_result,
+        visit_order: c?.visit_order || null,
+        invoice_created: update.visit_result === 'visited',
+        visited_at: visitedAt,
+      }).catch(() => {/* sessizce yut, UI optimistic */});
+    }
 
     const messages = {
       visited: 'Nokta gidilmiş olarak işaretlendi',
@@ -256,10 +273,12 @@ const RouteMapPage = ({ routeDay = 'MON' }) => {
     window.open(`tel:${phone}`, '_self');
   };
 
-  const sortedCustomers = useMemo(
-    () => [...customers].sort((a, b) => a.visit_order - b.visit_order),
-    [customers]
-  );
+  const sortedCustomers = useMemo(() => {
+    const orderKey = smartOrderingEnabled
+      ? (c) => c.suggested_visit_order || c.visit_order || 0
+      : (c) => c.visit_order || 0;
+    return [...customers].sort((a, b) => orderKey(a) - orderKey(b));
+  }, [customers, smartOrderingEnabled]);
 
   const pendingCustomers = useMemo(
     () => sortedCustomers.filter(c => statusMap[c.id]?.status !== 'visited'),

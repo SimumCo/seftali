@@ -322,6 +322,7 @@ class SystemSettingsBody(BaseModel):
     order_cutoff_hour: Optional[int] = None
     order_cutoff_minute: Optional[int] = None
     auto_draft_enabled: Optional[bool] = None
+    smart_ordering_enabled: Optional[bool] = None
 
 COL_SETTINGS = "sf_system_settings"
 
@@ -361,6 +362,9 @@ async def update_system_settings(
     
     if body.auto_draft_enabled is not None:
         update_data["auto_draft_enabled"] = body.auto_draft_enabled
+
+    if body.smart_ordering_enabled is not None:
+        update_data["smart_ordering_enabled"] = body.smart_ordering_enabled
     
     if update_data:
         update_data["updated_at"] = datetime.now(timezone.utc).isoformat()

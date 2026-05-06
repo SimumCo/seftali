@@ -17,6 +17,16 @@ _pool: Optional[asyncpg.Pool] = None
 
 async def _get_pool() -> asyncpg.Pool:
     global _pool
+    # Yeniden kullanılabilirlik için: pool farklı (kapanmış) bir event loop'a
+    # bağlıysa (örn. pytest test izolasyonu) onu sıfırla.
+    if _pool is not None:
+        try:
+            loop = asyncio.get_running_loop()
+            pool_loop = getattr(_pool, "_loop", None)
+            if pool_loop is not None and pool_loop is not loop:
+                _pool = None
+        except RuntimeError:
+            pass
     if _pool is None:
         dsn = os.environ.get("DATABASE_URL", "")
         _pool = await asyncpg.create_pool(dsn, min_size=2, max_size=10)

@@ -40,6 +40,7 @@ COL_STOCK_DECLARATIONS = "sf_stock_declarations"
 COL_PLASIYER_STOCK = "plasiyer_stock"
 COL_WAREHOUSE_STOCK = "sf_warehouse_stock"
 COL_REGIONS = "sf_regions"
+COL_ROUTE_VISIT_HISTORY = "sf_route_visit_history"
 
 # Draft Engine collections
 COL_DE_STATE = "de_customer_product_state"

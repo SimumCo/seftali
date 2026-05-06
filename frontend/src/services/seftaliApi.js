@@ -48,6 +48,7 @@ export const sfSalesAPI = {
   // Rota Haritası & Optimizasyon
   getRouteMap: (routeDay, optimize = false) => api.get(`/seftali/sales/route-map/${routeDay}`, { params: { optimize } }),
   optimizeRoute: (data) => api.post('/seftali/sales/route-map/optimize', data),
+  recordRouteVisit: (data) => api.post('/seftali/sales/route-map/visit', data),
 };
 
 // ŞEFTALİ Admin API
