@@ -5,14 +5,14 @@ Fatura ile ilgili tüm database operasyonları.
 """
 
 from typing import Dict, List, Optional
-from repositories.base_repository import BaseRepository, AsyncIOMotorDatabase
+from repositories.base_repository import BaseRepository
 
 
 class InvoiceRepository(BaseRepository):
     """Repository for invoice operations"""
     
-    def __init__(self, db: AsyncIOMotorDatabase):
-        super().__init__(db, "invoices")
+    def __init__(self, db=None):
+        super().__init__("invoices", db)
     
     async def find_by_invoice_number(self, invoice_number: str) -> Optional[Dict]:
         """Find invoice by invoice number"""

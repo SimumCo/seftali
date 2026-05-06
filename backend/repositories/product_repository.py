@@ -5,14 +5,14 @@ Product Repository
 """
 
 from typing import Dict, List, Optional
-from repositories.base_repository import BaseRepository, AsyncIOMotorDatabase
+from repositories.base_repository import BaseRepository
 
 
 class ProductRepository(BaseRepository):
     """Repository for product operations"""
     
-    def __init__(self, db: AsyncIOMotorDatabase):
-        super().__init__(db, "products")
+    def __init__(self, db=None):
+        super().__init__("products", db)
     
     async def find_by_sku(self, sku: str) -> Optional[Dict]:
         """Find product by SKU"""

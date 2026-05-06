@@ -1,6 +1,5 @@
 from datetime import datetime, timezone, timedelta
 from typing import Optional
-from pymongo import DESCENDING
 
 from config.database import db
 
@@ -15,12 +14,7 @@ class EInvoiceRepository:
         self.logs = db['invoice_provider_logs']
 
     async def ensure_indexes(self):
-        await self.invoices.create_index('local_reference_id', unique=True, sparse=True)
-        await self.invoices.create_index('provider_invoice_id', sparse=True)
-        await self.invoices.create_index('status')
-        await self.invoices.create_index('next_status_check_at')
-        await self.logs.create_index('invoice_id')
-        await self.logs.create_index([('created_at', DESCENDING)])
+        pass  # PostgreSQL JSONB adaptörü — indeksler gerektiğinde ayrıca yönetilir
 
     async def create_invoice(self, payload: dict):
         await self.invoices.insert_one(payload)
@@ -55,3 +49,4 @@ class EInvoiceRepository:
             {'_id': 0},
         ).sort('updated_at', 1).limit(limit)
         return await cursor.to_list(length=limit)
+

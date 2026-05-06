@@ -6,14 +6,13 @@ Müşteri ile ilgili business logic.
 
 from typing import Dict, Optional
 from repositories.customer_repository import CustomerRepository
-from repositories.base_repository import AsyncIOMotorDatabase
 import random
 
 
 class CustomerService:
     """Service for customer business logic"""
     
-    def __init__(self, db: AsyncIOMotorDatabase):
+    def __init__(self, db=None):
         self.customer_repo = CustomerRepository(db)
     
     async def find_by_tax_id(self, tax_id: str) -> Optional[Dict]:

@@ -5,7 +5,7 @@ Haftalık ve aylık tüketim aggregation ve analiz servisi
 
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
-from motor.motor_asyncio import AsyncIOMotorDatabase
+AsyncIOMotorDatabase = object
 from models.consumption_period import ConsumptionPeriod, YearOverYearComparison, TrendAnalysis
 import logging
 

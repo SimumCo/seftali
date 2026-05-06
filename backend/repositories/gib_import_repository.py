@@ -1,8 +1,6 @@
 from datetime import datetime, timezone
 import uuid
 
-from pymongo import UpdateOne
-
 from repositories.base_repository import BaseRepository
 from services.gib_import.constants import (
     COLL_CUSTOMERS,
@@ -348,24 +346,25 @@ class GIBImportRepository:
             return {'created': 0, 'updated': 0}
 
         now = _now_iso()
-        operations = []
+        created = 0
+        updated = 0
         for row in rows:
             payload = {**row, 'updated_at': now}
-            operations.append(
-                UpdateOne(
-                    {'customer_id': row['customer_id'], 'product_id': row['product_id'], 'date': row['date']},
-                    {
-                        '$set': payload,
-                        '$setOnInsert': {'id': _id(), 'created_at': now},
-                    },
-                    upsert=True,
-                )
+            existing = await self.db[COLL_CUSTOMER_PRODUCT_DAILY_CONSUMPTIONS].find_one(
+                {'customer_id': row['customer_id'], 'product_id': row['product_id'], 'date': row['date']},
+                {'_id': 0},
             )
-        result = await self.db[COLL_CUSTOMER_PRODUCT_DAILY_CONSUMPTIONS].bulk_write(operations, ordered=False, session=session)
-        return {
-            'created': result.upserted_count,
-            'updated': result.modified_count,
-        }
+            if existing:
+                await self.db[COLL_CUSTOMER_PRODUCT_DAILY_CONSUMPTIONS].update_one(
+                    {'id': existing['id']},
+                    {'$set': payload},
+                )
+                updated += 1
+            else:
+                doc = {'id': _id(), **payload, 'created_at': now}
+                await self.db[COLL_CUSTOMER_PRODUCT_DAILY_CONSUMPTIONS].insert_one(doc)
+                created += 1
+        return {'created': created, 'updated': updated}
 
     async def list_customer_product_daily_consumptions(self, customer_id: str, product_id: str | None = None, session=None) -> list:
         query = {'customer_id': customer_id}

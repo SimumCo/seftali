@@ -5,14 +5,14 @@ Müşteri ile ilgili tüm database operasyonları.
 """
 
 from typing import Dict, List, Optional
-from repositories.base_repository import BaseRepository, AsyncIOMotorDatabase
+from repositories.base_repository import BaseRepository
 
 
 class CustomerRepository(BaseRepository):
     """Repository for customer operations"""
     
-    def __init__(self, db: AsyncIOMotorDatabase):
-        super().__init__(db, "users")
+    def __init__(self, db=None):
+        super().__init__("users", db)
     
     async def find_by_username(self, username: str) -> Optional[Dict]:
         """Find customer by username"""

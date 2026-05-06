@@ -5,7 +5,7 @@ Fatura bazlı müşteri tüketim hesaplama servisi
 
 from datetime import datetime
 from typing import List, Dict, Optional
-from motor.motor_asyncio import AsyncIOMotorDatabase
+AsyncIOMotorDatabase = object
 from models.customer_consumption import CustomerConsumption
 import logging
 

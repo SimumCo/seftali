@@ -8,7 +8,6 @@ from typing import Dict, List, Optional
 from repositories.invoice_repository import InvoiceRepository
 from repositories.product_repository import ProductRepository
 from services.customer_service import CustomerService
-from repositories.base_repository import AsyncIOMotorDatabase
 from models.invoice import Invoice, InvoiceProduct
 from bs4 import BeautifulSoup
 import re
@@ -17,7 +16,7 @@ import re
 class InvoiceService:
     """Service for invoice business logic"""
     
-    def __init__(self, db: AsyncIOMotorDatabase):
+    def __init__(self, db=None):
         self.invoice_repo = InvoiceRepository(db)
         self.product_repo = ProductRepository(db)
         self.customer_service = CustomerService(db)

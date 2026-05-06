@@ -2,6 +2,10 @@
 Base Repository Pattern - PostgreSQL JSONB adaptörü üzerinde çalışır.
 """
 from typing import Dict, List, Optional, Any
+
+# motor uyumluluğu için tip takma adı
+AsyncIOMotorDatabase = object
+
 from config.database import db as _global_db
 
 
