@@ -33,7 +33,7 @@ Türkçe B2B süt ürünleri dağıtım platformu. Müşteri sipariş, plasiyer 
 - **bulk_write yerine manuel loop**: Adaptör henüz `UpdateOne` operasyonlarını desteklemiyor; `gib_import_repository.py` manuel upsert yapıyor.
 - **Adaptör motor uyumlu kwargs**: `CollectionProxy` metotları `session=` gibi motor-spesifik kwarg'ları sessizce yutar (`**_ignored`).
 - **Tek tüketim sistemi**: Eski `ConsumptionCalculationService` + `PeriodicConsumptionService` silindi; tek geçerli sistem `services/gib_import/consumption_service.py:CustomerConsumptionService`. YoY/trend metodları (`compare_yoy`, `analyze_yearly_trend`, `yoy_overview`) bu servise eklendi, günlük tüketim satırlarından gerçek zamanlı aggregate yapılır.
-- **Plasiyer "Rut" sekmesi**: Sidebar `id='harita'` → `RouteMapPage` (liste odaklı yeniden tasarım: turuncu/yeşil segmentli özet bar + Bekleyen/Gidilmiş bölümleri, harita opsiyonel toggle). Eski `RutPage` artık kullanılmıyor.
+- **Plasiyer "Rut" sekmesi**: Sidebar `id='harita'` → `RouteMapPage` (liste odaklı: turuncu/yeşil segmentli özet bar + Bekleyen/Gidilmiş bölümleri, harita opsiyonel toggle). Bekleyen müşteriye tıklayınca `RouteActionModal` (`components/plasiyer/RouteActionModal.js`) açılır: Konum/Mesajlar/Fatura Oluştur butonları + 3 radyo (visited / visited_without_invoice / not_visited). Durum client-side `statusMap[id]={status,visit_result,visited_at}` içinde tutulur, müşteri otomatik Bekleyen↔Gidilmiş bölümleri arasında geçer. Gidilmiş müşteri tıklaması eski `CustomerDrawer`'ı açar. Eski `RutPage` artık kullanılmıyor.
 - **Plasiyer-müşteri eşleştirmesi**: `sf_customers.user_id` plasiyerin user.id'si ile bağlanır (`OrderService._get_route_customers` `user_id` ile filtre uygular, eski `salesperson_id` alanı seed verisinde yok).
 
 ## Product

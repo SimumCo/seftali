@@ -9,6 +9,7 @@ import {
   RefreshCw, Check, Clock, ChevronRight, X,
   MapPin, Zap,
 } from 'lucide-react';
+import RouteActionModal from './RouteActionModal';
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -154,7 +155,8 @@ const RouteMapPage = ({ routeDay = 'MON' }) => {
   const [optimizing, setOptimizing] = useState(false);
   const [activeView, setActiveView] = useState('list');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [visitedIds, setVisitedIds] = useState(new Set());
+  const [actionItem, setActionItem] = useState(null);
+  const [statusMap, setStatusMap] = useState({}); // { [id]: { status, visit_result, visited_at } }
   const [totalDistance, setTotalDistance] = useState(null);
 
   const fetchRoute = useCallback(async (optimize = false) => {
@@ -180,17 +182,56 @@ const RouteMapPage = ({ routeDay = 'MON' }) => {
 
   useEffect(() => { fetchRoute(false); }, [fetchRoute]);
 
+  // routeDay değişiminde günler arası state sızıntısını önle
+  useEffect(() => {
+    setStatusMap({});
+    setActionItem(null);
+    setSelectedCustomer(null);
+  }, [routeDay]);
+
+  const isVisitedId = (id) => statusMap[id]?.status === 'visited';
+
   const toggleVisited = (customerId) => {
-    setVisitedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(customerId)) next.delete(customerId);
-      else next.add(customerId);
-      return next;
-    });
+    const wasVisited = isVisitedId(customerId);
+    setStatusMap(prev => ({
+      ...prev,
+      [customerId]: wasVisited
+        ? { status: 'pending', visit_result: 'not_visited', visited_at: null }
+        : { status: 'visited', visit_result: 'visited', visited_at: new Date().toISOString() },
+    }));
     const c = customers.find(x => x.id === customerId);
-    if (c) toast.success(visitedIds.has(customerId)
-      ? `${c.name} bekleyene alındı`
-      : `${c.name} gidildi olarak işaretlendi`);
+    if (c) toast.success(wasVisited ? `${c.name} bekleyene alındı` : `${c.name} gidildi olarak işaretlendi`);
+  };
+
+  // RouteActionModal onaylandığında durumu güncelle
+  const handleActionConfirm = (customerId, update) => {
+    const next = {
+      status: update.status,
+      visit_result: update.visit_result,
+      visited_at: update.status === 'visited' ? new Date().toISOString() : null,
+    };
+    setStatusMap(prev => ({ ...prev, [customerId]: next }));
+    setActionItem(null);
+
+    const messages = {
+      visited: 'Nokta gidilmiş olarak işaretlendi',
+      visited_without_invoice: 'Nokta fatura oluşturmadan gidilmiş olarak işaretlendi',
+      not_visited: 'Nokta bekleyen listesinde bırakıldı',
+    };
+    toast.success(messages[update.visit_result] || 'Rut durumu güncellendi');
+  };
+
+  const handleOpenLocationById = (customerId) => {
+    const c = customers.find(x => x.id === customerId);
+    if (c) openGoogleMaps(c);
+  };
+  const handleOpenMessagesById = (customerId) => {
+    const c = customers.find(x => x.id === customerId);
+    if (c) openWhatsApp(c.phone);
+  };
+  const handleOpenInvoiceById = (customerId) => {
+    const c = customers.find(x => x.id === customerId);
+    if (c) toast.info(`${c.name} için fatura oluşturma akışı henüz bağlı değil`);
   };
 
   const openGoogleMaps = (customer) => {
@@ -221,12 +262,12 @@ const RouteMapPage = ({ routeDay = 'MON' }) => {
   );
 
   const pendingCustomers = useMemo(
-    () => sortedCustomers.filter(c => !visitedIds.has(c.id)),
-    [sortedCustomers, visitedIds]
+    () => sortedCustomers.filter(c => statusMap[c.id]?.status !== 'visited'),
+    [sortedCustomers, statusMap]
   );
   const visitedCustomers = useMemo(
-    () => sortedCustomers.filter(c => visitedIds.has(c.id)),
-    [sortedCustomers, visitedIds]
+    () => sortedCustomers.filter(c => statusMap[c.id]?.status === 'visited'),
+    [sortedCustomers, statusMap]
   );
 
   const mappedCustomers = useMemo(
@@ -330,7 +371,7 @@ const RouteMapPage = ({ routeDay = 'MON' }) => {
                 accentColor="orange"
                 customers={pendingCustomers}
                 variant="pending"
-                onItemClick={setSelectedCustomer}
+                onItemClick={setActionItem}
                 testId="section-pending"
               />
               <RouteSection
@@ -374,13 +415,13 @@ const RouteMapPage = ({ routeDay = 'MON' }) => {
                 />
               )}
               {mappedCustomers.map(c => {
-                const isVisited = visitedIds.has(c.id);
+                const isVisited = isVisitedId(c.id);
                 return (
                   <Marker
                     key={c.id}
                     position={[c.location.lat, c.location.lng]}
                     icon={createMarkerIcon(c.visit_order, isVisited)}
-                    eventHandlers={{ click: () => setSelectedCustomer(c) }}
+                    eventHandlers={{ click: () => (isVisited ? setSelectedCustomer(c) : setActionItem(c)) }}
                   >
                     <Popup>
                       <div className="min-w-[180px]">
@@ -407,11 +448,22 @@ const RouteMapPage = ({ routeDay = 'MON' }) => {
         </div>
       )}
 
-      {/* ─── Müşteri Detay Drawer ─── */}
+      {/* ─── Bekleyen Müşteri İşlem Modali ─── */}
+      <RouteActionModal
+        isOpen={Boolean(actionItem)}
+        item={actionItem ? { ...actionItem, visit_result: statusMap[actionItem.id]?.visit_result || 'not_visited' } : null}
+        onClose={() => setActionItem(null)}
+        onConfirm={handleActionConfirm}
+        onOpenLocation={handleOpenLocationById}
+        onOpenMessages={handleOpenMessagesById}
+        onOpenInvoice={handleOpenInvoiceById}
+      />
+
+      {/* ─── Gidilmiş Müşteri Detay Drawer ─── */}
       {selectedCustomer && (
         <CustomerDrawer
           customer={selectedCustomer}
-          isVisited={visitedIds.has(selectedCustomer.id)}
+          isVisited={isVisitedId(selectedCustomer.id)}
           onClose={() => setSelectedCustomer(null)}
           onToggleVisited={() => toggleVisited(selectedCustomer.id)}
           onNavigate={() => openGoogleMaps(selectedCustomer)}

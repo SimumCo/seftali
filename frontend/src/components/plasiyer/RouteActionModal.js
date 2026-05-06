@@ -19,11 +19,11 @@ const RouteActionModal = ({
   onOpenMessages,
   onOpenInvoice,
 }) => {
-  const [selectedResult, setSelectedResult] = useState('not_visited');
+  const [selectedResult, setSelectedResult] = useState(null);
 
   useEffect(() => {
     if (isOpen && item) {
-      setSelectedResult(item.visit_result || 'not_visited');
+      setSelectedResult(item.visit_result || null);
     }
   }, [isOpen, item]);
 
@@ -47,6 +47,7 @@ const RouteActionModal = ({
   }
 
   const handleConfirm = () => {
+    if (!selectedResult) return;
     const nextState =
       selectedResult === 'not_visited'
         ? { status: 'pending', visit_result: 'not_visited' }
@@ -68,7 +69,7 @@ const RouteActionModal = ({
       data-testid="route-action-modal-overlay"
     >
       <div
-        className="w-full max-w-[34rem] rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_25px_80px_-30px_rgba(15,23,42,0.45)]"
+        className="w-[calc(100%-2.5rem)] max-w-[34rem] rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_25px_80px_-30px_rgba(15,23,42,0.45)]"
         data-testid="route-action-modal"
       >
         <h2 className="text-3xl font-bold tracking-tight text-slate-900" data-testid="route-action-modal-title">
@@ -144,7 +145,8 @@ const RouteActionModal = ({
         <button
           type="button"
           onClick={handleConfirm}
-          className="mt-5 w-full rounded-2xl bg-orange-500 px-4 py-3 text-3xl font-semibold text-white shadow-sm transition-colors hover:bg-orange-600"
+          disabled={!selectedResult}
+          className="mt-5 w-full rounded-2xl bg-orange-500 px-4 py-3 text-3xl font-semibold text-white shadow-sm transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-orange-300"
           data-testid="route-action-confirm-button"
         >
           Seç

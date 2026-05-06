@@ -1,0 +1,77 @@
+Create a reusable modal component called RouteActionModal for the Route page.
+
+Purpose:
+When a pending customer is clicked, open this modal.
+
+UI:
+- Centered modal
+- Dimmed backdrop
+- Rounded corners
+- Title: "İşlemi Seç"
+
+Buttons at top (full width, vertical):
+- Konum
+- Mesajlar
+- Fatura Oluştur
+
+Section below:
+Label: "Fatura oluşturmadan devam et"
+
+Single-select options:
+- Ziyaret gerçekleşti
+- Fatura oluşturulmadı
+- Ziyaret gerçekleşmedi
+
+Important:
+- These must behave like radio selection, not multiple checkbox selection
+- Only one option can be active at a time
+- Default: none selected
+
+Bottom button:
+- "Seç"
+
+Behavior:
+- Konum => call openLocation(customerId)
+- Mesajlar => call openMessages(customerId)
+- Fatura Oluştur => call openInvoice(customerId)
+
+- Seç button:
+  - if "Ziyaret gerçekleşti" => mark as visited
+  - if "Fatura oluşturulmadı" => mark as visited_without_invoice
+  - if "Ziyaret gerçekleşmedi" => keep as pending
+
+Backend event flow:
+Create one status update handler for selected customer.
+
+Allowed result states:
+- visited
+- visited_without_invoice
+- pending
+
+State rules:
+- visited => move customer from pending list to visited list
+- visited_without_invoice => move customer from pending list to visited list
+- pending => keep customer in pending list
+
+Update these fields when confirmed:
+- status
+- visit_result
+- visited_at (only for visited or visited_without_invoice)
+
+Suggested values:
+- status: "pending" | "visited"
+- visit_result: "visited" | "visited_without_invoice" | "not_visited"
+
+Mapping:
+- "Ziyaret gerçekleşti" => status="visited", visit_result="visited"
+- "Fatura oluşturulmadı" => status="visited", visit_result="visited_without_invoice"
+- "Ziyaret gerçekleşmedi" => status="pending", visit_result="not_visited"
+
+Component requirements:
+- props: isOpen, onClose, customerId, onStatusChange
+- close on outside click
+- close on ESC
+- reusable and clean
+
+Do not redesign the page.
+Only build the modal and its selection/state-update logic.
