@@ -178,6 +178,134 @@ async def main():
     else:
         print("   - Order settings mevcut")
 
+    # ---- 6. Örnek bildirimler ----
+    print("\n6. Bildirimler...")
+    one_day_ago = NOW - timedelta(days=1)
+    three_days_ago = NOW - timedelta(days=3)
+    five_days_ago = NOW - timedelta(days=5)
+
+    demo_notifications_by_user = {
+        "sf_musteri": [
+            {
+                "type": "order_created",
+                "title": "Yeni Sipariş Oluşturuldu",
+                "message": "Sipariş numaranız: ORD-2024-001. Siparişiniz başarıyla alındı ve işleme konuldu.",
+                "is_read": False, "created_at": iso(one_day_ago),
+            },
+            {
+                "type": "order_status",
+                "title": "Sipariş Durumu Güncellendi",
+                "message": "Siparişiniz teslim edildi. Keyifli alışverişler!",
+                "is_read": True, "created_at": iso(three_days_ago),
+            },
+            {
+                "type": "campaign",
+                "title": "Yeni Kampanya: Yaz Sezonu İndirimi",
+                "message": "Tüm ayran ürünlerinde %15 indirim! Kampanya 30 Haziran'a kadar geçerlidir.",
+                "is_read": False, "created_at": iso(five_days_ago),
+            },
+        ],
+        "sf_musteri2": [
+            {
+                "type": "order_created",
+                "title": "Yeni Sipariş Oluşturuldu",
+                "message": "Sipariş numaranız: ORD-2024-002. Siparişiniz başarıyla alındı ve işleme konuldu.",
+                "is_read": False, "created_at": iso(one_day_ago),
+            },
+            {
+                "type": "campaign",
+                "title": "Yeni Kampanya: Restoran Paketi",
+                "message": "Restoran müşterilerine özel yoğurt ve süt paketlerinde %10 indirim fırsatı!",
+                "is_read": False, "created_at": iso(three_days_ago),
+            },
+            {
+                "type": "system",
+                "title": "Hoş Geldiniz",
+                "message": "Şeftali Süt Ürünleri sistemine hoş geldiniz. Sipariş ve teslimat işlemlerinizi buradan takip edebilirsiniz.",
+                "is_read": True, "created_at": iso(five_days_ago),
+            },
+        ],
+        "admin": [
+            {
+                "type": "system",
+                "title": "Yeni Arıza Bildirimi",
+                "message": "Müşteri arızalı ürün bildirdi: Ayran Bardak. Lütfen inceleyiniz.",
+                "is_read": False, "created_at": iso(one_day_ago),
+            },
+            {
+                "type": "system",
+                "title": "Stok Uyarısı",
+                "message": "Süzme Yoğurt stok seviyesi kritik sınırın altına düştü. Tedarik planlaması yapılması önerilir.",
+                "is_read": False, "created_at": iso(three_days_ago),
+            },
+        ],
+        "muhasebe": [
+            {
+                "type": "system",
+                "title": "Yeni Fatura Bekliyor",
+                "message": "FTR-003 numaralı fatura onay bekliyor. Lütfen muhasebe panelinden kontrol ediniz.",
+                "is_read": False, "created_at": iso(one_day_ago),
+            },
+            {
+                "type": "system",
+                "title": "Aylık Tüketim Raporu Hazır",
+                "message": "Nisan ayına ait tüketim raporu oluşturuldu. GİB entegrasyonu için hazır durumda.",
+                "is_read": True, "created_at": iso(five_days_ago),
+            },
+        ],
+        "plasiyer1": [
+            {
+                "type": "system",
+                "title": "Rota Güncellendi",
+                "message": "Pazartesi rotanıza 2 yeni müşteri eklendi. Rota haritasını güncel bilgilerle kontrol ediniz.",
+                "is_read": False, "created_at": iso(one_day_ago),
+            },
+            {
+                "type": "campaign",
+                "title": "Yeni Kampanya: Yaz Sezonu İndirimi",
+                "message": "Tüm ayran ürünlerinde %15 indirim kampanyası başladı. Müşterilerinize bilgi veriniz.",
+                "is_read": False, "created_at": iso(three_days_ago),
+            },
+        ],
+        "sf_satici": [
+            {
+                "type": "order_created",
+                "title": "Yeni Sipariş Alındı",
+                "message": "Müşteri A - Market yeni sipariş oluşturdu: ORD-2024-001. Teslimat planlaması yapınız.",
+                "is_read": False, "created_at": iso(one_day_ago),
+            },
+            {
+                "type": "system",
+                "title": "Hedef Hatırlatması",
+                "message": "Bu ay için belirlenen satış hedefinin %68'ine ulaşıldı. Ayın bitmesine 12 gün kaldı.",
+                "is_read": True, "created_at": iso(three_days_ago),
+            },
+        ],
+    }
+
+    total_added = 0
+    for username, notifs in demo_notifications_by_user.items():
+        uid = user_ids.get(username)
+        if not uid:
+            continue
+        existing_count = await db['notifications'].count_documents({"user_id": uid})
+        if existing_count == 0:
+            for n in notifs:
+                await db['notifications'].insert_one({
+                    "id": gid(), "user_id": uid,
+                    "related_order_id": None, "related_campaign_id": None,
+                    **n,
+                })
+            total_added += len(notifs)
+            print(f"   + {username}: {len(notifs)} bildirim oluşturuldu")
+        else:
+            print(f"   - {username}: {existing_count} bildirim mevcut")
+
+    if total_added:
+        print(f"   Toplam {total_added} yeni bildirim eklendi")
+    else:
+        print("   Tüm kullanıcıların bildirimleri zaten mevcut")
+
     print("\n" + "=" * 60)
     print("SEED TAMAMLANDI!")
     print("=" * 60)
