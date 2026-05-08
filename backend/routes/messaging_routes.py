@@ -7,6 +7,7 @@ import uuid
 from config.database import db
 from models.user import User, UserRole
 from utils.auth import get_current_user, require_role
+from services.notification_service import create_notification
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
@@ -32,15 +33,13 @@ async def get_notifications(
         query["is_read"] = is_read
 
     cursor = db.notifications.find(query, {"_id": 0}).sort("created_at", -1)
-    notifications = await cursor.to_list(limit)
-    return notifications
+    return await cursor.to_list(limit)
 
 
 @router.get("/unread-count")
 async def get_unread_count(current_user: User = Depends(get_current_user)):
-    cursor = db.notifications.find({"user_id": current_user.id, "is_read": False}, {"_id": 0})
-    items = await cursor.to_list(10000)
-    return {"count": len(items)}
+    count = await db.notifications.count_documents({"user_id": current_user.id, "is_read": False})
+    return {"count": count}
 
 
 @router.put("/read-all")
@@ -62,7 +61,7 @@ async def mark_all_as_read_post(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/create")
-async def create_notification(
+async def create_notification_endpoint(
     data: NotificationCreateRequest,
     current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.ACCOUNTING]))
 ):
@@ -81,19 +80,15 @@ async def create_notification(
 
     created_ids = []
     for uid in target_user_ids:
-        notification = {
-            "id": str(uuid.uuid4()),
-            "user_id": uid,
-            "type": data.type,
-            "title": data.title,
-            "message": data.message,
-            "is_read": False,
-            "related_order_id": data.related_order_id,
-            "related_campaign_id": data.related_campaign_id,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-        await db.notifications.insert_one(notification)
-        created_ids.append(notification["id"])
+        notif_id = await create_notification(
+            user_id=uid,
+            notification_type=data.type,
+            title=data.title,
+            message=data.message,
+            related_order_id=data.related_order_id,
+            related_campaign_id=data.related_campaign_id,
+        )
+        created_ids.append(notif_id)
 
     return {"success": True, "created": len(created_ids), "ids": created_ids}
 
