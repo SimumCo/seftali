@@ -111,6 +111,15 @@ export const favoritesAPI = {
   check: (productId) => api.get(`/favorites/check/${productId}`),
 };
 
+// In-App Messaging API
+export const messagesAPI = {
+  createConversation: (data) => api.post('/messages/conversations', data),
+  listConversations: () => api.get('/messages/conversations'),
+  listMessages: (conversationId, params = {}) => api.get(`/messages/conversations/${conversationId}/messages`, { params }),
+  sendMessage: (conversationId, content) => api.post(`/messages/conversations/${conversationId}/messages`, { content }),
+  markRead: (conversationId) => api.post(`/messages/conversations/${conversationId}/read`),
+};
+
 // Notifications API (Merged)
 export const notificationsAPI = {
   getAll: (params = {}) => api.get('/notifications', { params }),

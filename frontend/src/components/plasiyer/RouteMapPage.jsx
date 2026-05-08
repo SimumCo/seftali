@@ -10,6 +10,7 @@ import {
   MapPin, Zap,
 } from 'lucide-react';
 import RouteActionModal from './RouteActionModal';
+import MessagingPanel from './MessagingPanel';
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -159,6 +160,7 @@ const RouteMapPage = ({ routeDay = 'MON' }) => {
   const [statusMap, setStatusMap] = useState({}); // { [id]: { status, visit_result, visited_at } }
   const [totalDistance, setTotalDistance] = useState(null);
   const [smartOrderingEnabled, setSmartOrderingEnabled] = useState(true);
+  const [messagingCustomer, setMessagingCustomer] = useState(null);
 
   const fetchRoute = useCallback(async (optimize = false) => {
     if (optimize) setOptimizing(true);
@@ -244,7 +246,10 @@ const RouteMapPage = ({ routeDay = 'MON' }) => {
   };
   const handleOpenMessagesById = (customerId) => {
     const c = customers.find(x => x.id === customerId);
-    if (c) openWhatsApp(c.phone);
+    if (c) {
+      setActionItem(null);
+      setMessagingCustomer(c);
+    }
   };
   const handleOpenInvoiceById = (customerId) => {
     const c = customers.find(x => x.id === customerId);
@@ -477,6 +482,14 @@ const RouteMapPage = ({ routeDay = 'MON' }) => {
         onOpenMessages={handleOpenMessagesById}
         onOpenInvoice={handleOpenInvoiceById}
       />
+
+      {/* ─── Dahili Mesajlaşma Paneli ─── */}
+      {messagingCustomer && (
+        <MessagingPanel
+          customer={messagingCustomer}
+          onClose={() => setMessagingCustomer(null)}
+        />
+      )}
 
       {/* ─── Gidilmiş Müşteri Detay Drawer ─── */}
       {selectedCustomer && (
