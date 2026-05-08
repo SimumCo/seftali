@@ -1,144 +1,124 @@
-from fastapi import APIRouter, HTTPException, Depends
-from typing import Optional, List
-from pydantic import BaseModel
+"""Uygulama içi mesajlaşma endpoint'leri."""
 from datetime import datetime, timezone
+from typing import List, Optional
 import uuid
 
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
+
 from config.database import db
-from models.user import User, UserRole
-from utils.auth import get_current_user, require_role
-from services.notification_service import create_notification
-
-router = APIRouter(prefix="/notifications", tags=["Notifications"])
+from models.user import User
+from utils.auth import get_current_user
 
 
-class NotificationCreateRequest(BaseModel):
-    user_id: Optional[str] = None
-    target_roles: Optional[List[str]] = None
-    type: str
-    title: str
-    message: str
-    related_order_id: Optional[str] = None
-    related_campaign_id: Optional[str] = None
+router = APIRouter(prefix="/messages", tags=["In-App Messaging"])
 
 
-@router.get("")
-async def get_notifications(
-    is_read: Optional[bool] = None,
-    limit: int = 50,
-    current_user: User = Depends(get_current_user)
+class ConversationCreateRequest(BaseModel):
+    participant_ids: List[str] = Field(min_length=1)
+    title: Optional[str] = None
+
+
+class MessageCreateRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=2000)
+
+
+@router.post("/conversations")
+async def create_conversation(
+    payload: ConversationCreateRequest,
+    current_user: User = Depends(get_current_user),
 ):
-    query: dict = {"user_id": current_user.id}
-    if is_read is not None:
-        query["is_read"] = is_read
+    participants = sorted(set(payload.participant_ids + [current_user.id]))
+    if len(participants) < 2:
+        raise HTTPException(status_code=400, detail="En az 2 katılımcı olmalı")
 
-    cursor = db.notifications.find(query, {"_id": 0}).sort("created_at", -1)
-    return await cursor.to_list(limit)
+    users_count = await db.users.count_documents({"id": {"$in": participants}})
+    if users_count != len(participants):
+        raise HTTPException(status_code=400, detail="Geçersiz katılımcı listesi")
+
+    existing = await db.conversations.find_one({"participant_ids": participants}, {"_id": 0})
+    if existing:
+        return existing
+
+    conversation = {
+        "id": str(uuid.uuid4()),
+        "participant_ids": participants,
+        "title": payload.title,
+        "created_by": current_user.id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "last_message": None,
+    }
+    await db.conversations.insert_one(conversation)
+    return conversation
 
 
-@router.get("/unread-count")
-async def get_unread_count(current_user: User = Depends(get_current_user)):
-    count = await db.notifications.count_documents({"user_id": current_user.id, "is_read": False})
-    return {"count": count}
+@router.get("/conversations")
+async def list_conversations(current_user: User = Depends(get_current_user)):
+    items = await db.conversations.find(
+        {"participant_ids": current_user.id},
+        {"_id": 0}
+    ).sort("updated_at", -1).to_list(length=200)
+    return items
 
 
-@router.put("/read-all")
-async def mark_all_as_read_put(current_user: User = Depends(get_current_user)):
-    await db.notifications.update_many(
-        {"user_id": current_user.id, "is_read": False},
-        {"$set": {"is_read": True, "read_at": datetime.now(timezone.utc).isoformat()}}
+@router.get("/conversations/{conversation_id}/messages")
+async def list_messages(
+    conversation_id: str,
+    limit: int = Query(default=50, ge=1, le=200),
+    before: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+):
+    conversation = await db.conversations.find_one({"id": conversation_id}, {"_id": 0})
+    if not conversation or current_user.id not in conversation.get("participant_ids", []):
+        raise HTTPException(status_code=404, detail="Konuşma bulunamadı")
+
+    query = {"conversation_id": conversation_id}
+    if before:
+        query["created_at"] = {"$lt": before}
+
+    items = await db.messages.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(length=limit)
+    return list(reversed(items))
+
+
+@router.post("/conversations/{conversation_id}/messages")
+async def send_message(
+    conversation_id: str,
+    payload: MessageCreateRequest,
+    current_user: User = Depends(get_current_user),
+):
+    conversation = await db.conversations.find_one({"id": conversation_id}, {"_id": 0})
+    if not conversation or current_user.id not in conversation.get("participant_ids", []):
+        raise HTTPException(status_code=404, detail="Konuşma bulunamadı")
+
+    now = datetime.now(timezone.utc).isoformat()
+    message = {
+        "id": str(uuid.uuid4()),
+        "conversation_id": conversation_id,
+        "sender_id": current_user.id,
+        "content": payload.content.strip(),
+        "created_at": now,
+        "read_by": [current_user.id],
+    }
+    await db.messages.insert_one(message)
+    await db.conversations.update_one(
+        {"id": conversation_id},
+        {"$set": {"updated_at": now, "last_message": message}},
     )
-    return {"success": True, "message": "Tüm bildirimler okundu olarak işaretlendi"}
+    return message
 
 
-@router.post("/mark-all-read")
-async def mark_all_as_read_post(current_user: User = Depends(get_current_user)):
-    await db.notifications.update_many(
-        {"user_id": current_user.id, "is_read": False},
-        {"$set": {"is_read": True, "read_at": datetime.now(timezone.utc).isoformat()}}
+@router.post("/conversations/{conversation_id}/read")
+async def mark_conversation_read(
+    conversation_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    conversation = await db.conversations.find_one({"id": conversation_id}, {"_id": 0})
+    if not conversation or current_user.id not in conversation.get("participant_ids", []):
+        raise HTTPException(status_code=404, detail="Konuşma bulunamadı")
+
+    result = await db.messages.update_many(
+        {"conversation_id": conversation_id, "read_by": {"$ne": current_user.id}},
+        {"$addToSet": {"read_by": current_user.id}},
     )
-    return {"success": True, "message": "Tüm bildirimler okundu olarak işaretlendi"}
-
-
-@router.post("/create")
-async def create_notification_endpoint(
-    data: NotificationCreateRequest,
-    current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.ACCOUNTING]))
-):
-    target_user_ids: List[str] = []
-
-    if data.user_id:
-        target_user_ids = [data.user_id]
-    elif data.target_roles:
-        cursor = db.users.find(
-            {"role": {"$in": data.target_roles}, "is_active": True}, {"_id": 0}
-        )
-        users = await cursor.to_list(1000)
-        target_user_ids = [u["id"] for u in users]
-    else:
-        raise HTTPException(status_code=400, detail="user_id veya target_roles belirtilmeli")
-
-    created_ids = []
-    for uid in target_user_ids:
-        notif_id = await create_notification(
-            user_id=uid,
-            notification_type=data.type,
-            title=data.title,
-            message=data.message,
-            related_order_id=data.related_order_id,
-            related_campaign_id=data.related_campaign_id,
-        )
-        created_ids.append(notif_id)
-
-    return {"success": True, "created": len(created_ids), "ids": created_ids}
-
-
-@router.put("/{notification_id}/read")
-async def mark_as_read_put(
-    notification_id: str,
-    current_user: User = Depends(get_current_user)
-):
-    notif = await db.notifications.find_one({"id": notification_id}, {"_id": 0})
-    if not notif:
-        raise HTTPException(status_code=404, detail="Bildirim bulunamadı")
-    if notif.get("user_id") != current_user.id:
-        raise HTTPException(status_code=403, detail="Bu bildirimi okuma yetkiniz yok")
-
-    await db.notifications.update_one(
-        {"id": notification_id},
-        {"$set": {"is_read": True, "read_at": datetime.now(timezone.utc).isoformat()}}
-    )
-    return {"success": True}
-
-
-@router.post("/{notification_id}/mark-read")
-async def mark_as_read_post(
-    notification_id: str,
-    current_user: User = Depends(get_current_user)
-):
-    notif = await db.notifications.find_one({"id": notification_id}, {"_id": 0})
-    if not notif:
-        raise HTTPException(status_code=404, detail="Bildirim bulunamadı")
-    if notif.get("user_id") != current_user.id:
-        raise HTTPException(status_code=403, detail="Bu bildirimi okuma yetkiniz yok")
-
-    await db.notifications.update_one(
-        {"id": notification_id},
-        {"$set": {"is_read": True, "read_at": datetime.now(timezone.utc).isoformat()}}
-    )
-    return {"success": True}
-
-
-@router.delete("/{notification_id}")
-async def delete_notification(
-    notification_id: str,
-    current_user: User = Depends(get_current_user)
-):
-    notif = await db.notifications.find_one({"id": notification_id}, {"_id": 0})
-    if not notif:
-        raise HTTPException(status_code=404, detail="Bildirim bulunamadı")
-    if notif.get("user_id") != current_user.id:
-        raise HTTPException(status_code=403, detail="Bu bildirimi silme yetkiniz yok")
-
-    await db.notifications.delete_one({"id": notification_id})
-    return {"success": True}
+    return {"updated": result.modified_count}

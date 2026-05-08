@@ -62,7 +62,7 @@ api_router.include_router(gib_import_router)     # /api/gib/* + /api/draft-custo
 api_router.include_router(gib_live_router)       # /api/gib/live/*
 api_router.include_router(customer_auth_router)  # /api/auth/customer/*
 api_router.include_router(ebelge_router)         # /api/ebelge/*  (e-Fatura & e-İrsaliye)
-api_router.include_router(messaging_router)      # /api/notifications/*
+api_router.include_router(messaging_router)      # /api/messages/*
 
 # Register main router
 app.include_router(api_router)
