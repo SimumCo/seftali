@@ -31,21 +31,16 @@ async def get_notifications(
     if is_read is not None:
         query["is_read"] = is_read
 
-    notifications = await db.notifications.find(query, {"_id": 0})
-    if not isinstance(notifications, list):
-        notifications = list(notifications)
-
-    notifications.sort(key=lambda n: n.get("created_at", ""), reverse=True)
-    return notifications[:limit]
+    cursor = db.notifications.find(query, {"_id": 0}).sort("created_at", -1)
+    notifications = await cursor.to_list(limit)
+    return notifications
 
 
 @router.get("/unread-count")
 async def get_unread_count(current_user: User = Depends(get_current_user)):
-    query = {"user_id": current_user.id, "is_read": False}
-    all_notifs = await db.notifications.find(query, {"_id": 0})
-    if not isinstance(all_notifs, list):
-        all_notifs = list(all_notifs)
-    return {"count": len(all_notifs)}
+    cursor = db.notifications.find({"user_id": current_user.id, "is_read": False}, {"_id": 0})
+    items = await cursor.to_list(10000)
+    return {"count": len(items)}
 
 
 @router.put("/read-all")
@@ -76,11 +71,10 @@ async def create_notification(
     if data.user_id:
         target_user_ids = [data.user_id]
     elif data.target_roles:
-        users = await db.users.find(
+        cursor = db.users.find(
             {"role": {"$in": data.target_roles}, "is_active": True}, {"_id": 0}
         )
-        if not isinstance(users, list):
-            users = list(users)
+        users = await cursor.to_list(1000)
         target_user_ids = [u["id"] for u in users]
     else:
         raise HTTPException(status_code=400, detail="user_id veya target_roles belirtilmeli")
