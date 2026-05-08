@@ -2,7 +2,14 @@
 set -e
 
 npm install
-npm run db:push
+
+# Post-merge ortamında stdin kapalıdır; --force ile interactive soruları atla.
+# DRIZZLE_FORCE_PUSH=false olarak ayarlanırsa interactive mod kullanılır.
+if [ "${DRIZZLE_FORCE_PUSH:-true}" = "true" ]; then
+  npx drizzle-kit push --force
+else
+  npx drizzle-kit push
+fi
 
 # GitHub'a otomatik yedek push
 if [ -z "$GITHUB_TOKEN" ]; then
