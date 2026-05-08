@@ -1,8 +1,9 @@
 // Dağıtım Yönetim Sistemi - Ortak Layout ve Bileşenler
 // Tüm dashboard'lar için tutarlı yapı sağlar
 
-import React from 'react';
-import { Search, LogOut, Bell, ChevronRight, Home } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Search, LogOut, Bell, ChevronRight, Home, CheckCheck, X } from 'lucide-react';
+import { notificationsAPI } from '../../services/api';
 
 // ============================================
 // RENK PALETİ VE GRADIENTLAR
@@ -42,7 +43,6 @@ export const DashboardLayout = ({
   user,
   title = 'Panel',
   headerContent,
-  notificationCount = 0
 }) => {
   const userInitial = user?.full_name?.charAt(0) || 'U';
   const userName = user?.full_name || 'Kullanici';
@@ -66,7 +66,6 @@ export const DashboardLayout = ({
         <Header 
           userName={userName}
           userInitial={userInitial}
-          notificationCount={notificationCount}
         >
           {headerContent}
         </Header>
@@ -179,7 +178,6 @@ export const Header = ({
   children, 
   userName, 
   userInitial, 
-  notificationCount = 0,
   searchPlaceholder = "Ara..."
 }) => (
   <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between sticky top-0 z-20" data-testid="dashboard-header">
@@ -194,25 +192,202 @@ export const Header = ({
     </div>
     {children}
     <div className="flex items-center gap-4">
-      <NotificationBell count={notificationCount} />
+      <NotificationBell />
       <UserAvatar userInitial={userInitial} userName={userName} />
     </div>
   </header>
 );
 
-// Notification Bell
-const NotificationBell = ({ count }) => (
-  <div className="relative" data-testid="dashboard-notification-bell">
-    {count > 0 && (
-      <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center font-bold">
-        {count}
-      </span>
-    )}
-    <button className="p-2 hover:bg-slate-100 rounded-full" data-testid="dashboard-notification-button">
-      <Bell className="w-5 h-5 text-slate-600" />
-    </button>
-  </div>
-);
+// Notification Bell — canlı sayaç + dropdown panel
+const NotificationBell = () => {
+  const [open, setOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifications, setNotifications] = useState([]);
+  const [loadingList, setLoadingList] = useState(false);
+  const containerRef = useRef(null);
+
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const res = await notificationsAPI.getUnreadCount();
+      setUnreadCount(res.data?.count ?? 0);
+    } catch (err) {
+      console.debug('[NotificationBell] unread-count fetch failed:', err?.message);
+    }
+  }, []);
+
+  const fetchNotifications = useCallback(async () => {
+    setLoadingList(true);
+    try {
+      const res = await notificationsAPI.getAll({ limit: 30 });
+      setNotifications(res.data?.data || []);
+    } catch (err) {
+      console.warn('[NotificationBell] notification list fetch failed:', err?.message);
+    } finally {
+      setLoadingList(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, [fetchUnreadCount]);
+
+  useEffect(() => {
+    if (!open) return;
+    fetchNotifications();
+  }, [open, fetchNotifications]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  const handleMarkRead = async (id) => {
+    try {
+      await notificationsAPI.markAsRead(id);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (err) {
+      console.warn('[NotificationBell] mark-read failed:', err?.message);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await notificationsAPI.markAllAsRead();
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      setUnreadCount(0);
+    } catch (err) {
+      console.warn('[NotificationBell] mark-all-read failed:', err?.message);
+    }
+  };
+
+  const formatTime = (isoStr) => {
+    if (!isoStr) return '';
+    const d = new Date(isoStr);
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'Az önce';
+    if (diffMin < 60) return `${diffMin} dk önce`;
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24) return `${diffH} sa önce`;
+    const diffD = Math.floor(diffH / 24);
+    return `${diffD} gün önce`;
+  };
+
+  const typeColors = {
+    order_created: 'bg-sky-100 text-sky-700',
+    order_status: 'bg-emerald-100 text-emerald-700',
+    campaign: 'bg-amber-100 text-amber-700',
+    system: 'bg-slate-100 text-slate-600',
+    fault_response: 'bg-red-100 text-red-700',
+  };
+
+  return (
+    <div className="relative" ref={containerRef} data-testid="dashboard-notification-bell">
+      {unreadCount > 0 && (
+        <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center font-bold z-10 pointer-events-none">
+          {unreadCount > 99 ? '99+' : unreadCount}
+        </span>
+      )}
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="p-2 hover:bg-slate-100 rounded-full relative"
+        data-testid="dashboard-notification-button"
+        aria-label="Bildirimler"
+      >
+        <Bell className="w-5 h-5 text-slate-600" />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 flex flex-col max-h-[480px]" data-testid="notification-panel">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+            <h3 className="text-sm font-semibold text-slate-800">
+              Bildirimler
+              {unreadCount > 0 && (
+                <span className="ml-2 bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5">
+                  {unreadCount}
+                </span>
+              )}
+            </h3>
+            <div className="flex items-center gap-1">
+              {unreadCount > 0 && (
+                <button
+                  onClick={handleMarkAllRead}
+                  className="flex items-center gap-1 text-xs text-slate-500 hover:text-orange-600 px-2 py-1 rounded-lg hover:bg-orange-50 transition-colors"
+                  data-testid="notification-mark-all-read"
+                  title="Tümünü okundu işaretle"
+                >
+                  <CheckCheck className="w-3.5 h-3.5" />
+                  Tümü
+                </button>
+              )}
+              <button
+                onClick={() => setOpen(false)}
+                className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                data-testid="notification-panel-close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {loadingList ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-500" />
+              </div>
+            ) : notifications.length === 0 ? (
+              <div className="text-center py-10">
+                <Bell className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                <p className="text-sm text-slate-400">Bildirim yok</p>
+              </div>
+            ) : (
+              <ul>
+                {notifications.map(n => (
+                  <li
+                    key={n.id}
+                    className={`px-4 py-3 border-b border-slate-50 last:border-b-0 flex gap-3 cursor-pointer transition-colors ${n.is_read ? 'hover:bg-slate-50' : 'bg-orange-50 hover:bg-orange-100'}`}
+                    onClick={() => !n.is_read && handleMarkRead(n.id)}
+                    data-testid={`notification-item-${n.id}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={`text-xs font-semibold truncate ${n.is_read ? 'text-slate-600' : 'text-slate-900'}`}>
+                          {n.title}
+                        </p>
+                        {!n.is_read && (
+                          <span className="flex-shrink-0 w-2 h-2 bg-orange-500 rounded-full mt-1" />
+                        )}
+                      </div>
+                      <p className={`text-xs mt-0.5 line-clamp-2 ${n.is_read ? 'text-slate-400' : 'text-slate-600'}`}>
+                        {n.message}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${typeColors[n.type] || 'bg-slate-100 text-slate-500'}`}>
+                          {n.type?.replace(/_/g, ' ')}
+                        </span>
+                        <span className="text-[10px] text-slate-400">{formatTime(n.created_at)}</span>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // User Avatar
 const UserAvatar = ({ userInitial, userName }) => (

@@ -22,6 +22,7 @@ from routes.customer_auth_routes import router as customer_auth_router
 from routes.invoices_routes import router as invoices_router
 from routes.ebelge_routes import router as ebelge_router
 from routes.messaging_routes import router as messaging_router
+from routes.notifications_routes import router as notifications_router
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -63,6 +64,7 @@ api_router.include_router(gib_live_router)       # /api/gib/live/*
 api_router.include_router(customer_auth_router)  # /api/auth/customer/*
 api_router.include_router(ebelge_router)         # /api/ebelge/*  (e-Fatura & e-İrsaliye)
 api_router.include_router(messaging_router)      # /api/messages/*
+api_router.include_router(notifications_router)  # /api/notifications/*
 
 # Register main router
 app.include_router(api_router)
