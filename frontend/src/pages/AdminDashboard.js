@@ -120,6 +120,10 @@ const AdminDashboard = () => {
       user={user}
       title="Admin Panel"
       notificationCount={pendingOrdersCount}
+      onNavigate={(n) => {
+        if (n.related_order_id) setActiveTab('warehouse');
+        else if (n.related_campaign_id) setActiveTab('campaigns');
+      }}
     >
       {renderContent()}
     </DashboardLayout>

@@ -220,6 +220,10 @@ const CustomerDashboard = () => {
             userName={userName}
             userInitial={userInitial}
             notificationCount={stats.pendingDeliveries}
+            onNavigate={(n) => {
+              if (n.related_order_id) setActiveTab('draft');
+              else if (n.related_campaign_id) setActiveTab('campaigns');
+            }}
           />
         </div>
 

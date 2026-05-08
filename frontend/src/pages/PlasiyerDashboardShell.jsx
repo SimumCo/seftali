@@ -315,6 +315,10 @@ const PlasiyerDashboardShell = () => {
       user={user}
       title="Plasiyer Panel"
       notificationCount={stats.pendingOrders}
+      onNavigate={(n) => {
+        if (n.related_order_id) handleTabChange('orders');
+        else if (n.related_campaign_id) handleTabChange('campaigns');
+      }}
     >
       {renderContent()}
       

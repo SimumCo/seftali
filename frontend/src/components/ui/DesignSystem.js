@@ -43,6 +43,7 @@ export const DashboardLayout = ({
   user,
   title = 'Panel',
   headerContent,
+  onNavigate,
 }) => {
   const userInitial = user?.full_name?.charAt(0) || 'U';
   const userName = user?.full_name || 'Kullanici';
@@ -66,6 +67,7 @@ export const DashboardLayout = ({
         <Header 
           userName={userName}
           userInitial={userInitial}
+          onNavigate={onNavigate}
         >
           {headerContent}
         </Header>
@@ -178,7 +180,8 @@ export const Header = ({
   children, 
   userName, 
   userInitial, 
-  searchPlaceholder = "Ara..."
+  searchPlaceholder = "Ara...",
+  onNavigate,
 }) => (
   <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between sticky top-0 z-20" data-testid="dashboard-header">
     <div className="relative flex-1 max-w-md">
@@ -192,14 +195,14 @@ export const Header = ({
     </div>
     {children}
     <div className="flex items-center gap-4">
-      <NotificationBell />
+      <NotificationBell onNavigate={onNavigate} />
       <UserAvatar userInitial={userInitial} userName={userName} />
     </div>
   </header>
 );
 
 // Notification Bell — canlı sayaç + dropdown panel
-const NotificationBell = () => {
+const NotificationBell = ({ onNavigate }) => {
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState([]);
@@ -256,6 +259,16 @@ const NotificationBell = () => {
       setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (err) {
       console.warn('[NotificationBell] mark-read failed:', err?.message);
+    }
+  };
+
+  const handleNotificationClick = async (n) => {
+    if (!n.is_read) {
+      await handleMarkRead(n.id);
+    }
+    if (onNavigate && (n.related_order_id || n.related_campaign_id)) {
+      setOpen(false);
+      onNavigate(n);
     }
   };
 
@@ -356,7 +369,7 @@ const NotificationBell = () => {
                   <li
                     key={n.id}
                     className={`px-4 py-3 border-b border-slate-50 last:border-b-0 flex gap-3 cursor-pointer transition-colors ${n.is_read ? 'hover:bg-slate-50' : 'bg-orange-50 hover:bg-orange-100'}`}
-                    onClick={() => !n.is_read && handleMarkRead(n.id)}
+                    onClick={() => handleNotificationClick(n)}
                     data-testid={`notification-item-${n.id}`}
                   >
                     <div className="flex-1 min-w-0">
